@@ -2,6 +2,7 @@ Before we start with Databricks query optimization, we should optimize how data 
 
 Here we will go through Hive-Style partitioning, Data Skipping, Z-Order and Liquid Clustering
 
+
 **Hive-Style partitioning:**
 Data is distributed across different folders based on the value of the partitioned column defined. The Partitioned column is not required to be provided in the schema as this column can be fetched by query engine from the folder structure.
 
