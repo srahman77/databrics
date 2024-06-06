@@ -7,10 +7,12 @@ Data is distributed across different folders based on the value of the partition
 
 * When to use Hive-Style partitioning?
 i)We know how the data will be distributed for the partitioned keys. It should not create highly skewed partiotions
-ii)Partition columns should have low cardianilty. Too many distinct values will create high number of partitions which will end up in creating small file problems. Hive-Style partition is advised when the table size is in TB level and each partition is in GB level.
+ii)Partition columns should have low cardianilty. Too many distinct values will create high number of partitions which will end up in creating small file problems. Hive-Style partition is advised when the table size is in TB level and each partition is in GB level. Fewer files to read is better, but again it should not be like a single too large file. That will eventually start to impact read performance. So the balance is -GB level partitions
 
 * Limitation? After defining partition columns, they cannot be changed directly. We need to create temp table, recreate the main table with updated partitions columns and then reload the the data from temp to main table.
 
+
+**Data Skipping using File statistics:**
 
 
 
