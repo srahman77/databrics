@@ -35,5 +35,7 @@ ii)Partition columns should have low cardianilty. Too many distinct values will 
     3) The effectiveness of Zordering drops with each added columns
     4) Zorder always comes with Optimize command
 * Zorder only improves the data skipping. It does not give the perfact solution for 100% data skipping.
+  ![image](https://github.com/srahman77/databrics/assets/58270885/936386a3-3fce-444c-8e5a-471890e25db4)
+
 
 
