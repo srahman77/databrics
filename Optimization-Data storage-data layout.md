@@ -14,6 +14,7 @@ ii)Partition columns should have low cardianilty. Too many distinct values will 
 
 
 **Data Skipping using File statistics:**
-
+* Used to skip files that do not have the predicate
+* File level statistics are collected for first 32 columns by default. The value can be configured by #dataSkippingNumIndexedCols#
 
 
