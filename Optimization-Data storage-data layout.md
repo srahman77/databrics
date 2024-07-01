@@ -14,7 +14,11 @@ ii)Partition columns should have low cardianilty. Too many distinct values will 
 
 
 **Data Skipping using File statistics:**
+* Data skipping information is collected automatically when you write data into a **Delta table**. Delta Lake takes advantage of this information (minimum and maximum values, null counts, and total records per file) at query time to provide faster queries.
 * Used to skip files that do not have the predicate
-* File level statistics are collected for first 32 columns by default. The value can be configured by #dataSkippingNumIndexedCols#
+* File level statistics are collected for first 32 columns by default. The value can be configured by _dataSkippingNumIndexedCols_
+* So use Keys,High Cardianility columns to the left side and timestamp, long string etc to the right of the _dataSkippingNumIndexedCols_ configyred values.
+* _dataSkippingStatsColumns_ (Databricks Runtime 13.3 LTS and above): Specify a list of column names for which Delta Lake collects statistics! _Supersedes dataSkippingNumIndexedCols_
+* The information for each file has 1) the file name 2)num of records in the file 3) min,max,null counts for the required columns
 
 
