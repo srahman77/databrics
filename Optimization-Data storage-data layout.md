@@ -36,6 +36,7 @@ ii)Partition columns should have low cardianilty. Too many distinct values will 
     4) Zorder always comes with Optimize command
 * Zorder only improves the data skipping. It does not give the perfact solution for 100% data skipping.
   ![image](https://github.com/srahman77/databrics/assets/58270885/936386a3-3fce-444c-8e5a-471890e25db4)
-
+  ( credit: https://www.youtube.com/watch?v=5t6wX28JC_M)
+* In the above pic, we can see that 1st and last partition have overlapping ids. So it did not resolve the unwanted file scanning completely- but improved. e.g if we need any id between 35300 to 71000 0r any balance between 20000 and 30000, we need to scan only 2nd partition
 
 
