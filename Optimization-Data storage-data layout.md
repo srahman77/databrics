@@ -20,5 +20,20 @@ ii)Partition columns should have low cardianilty. Too many distinct values will 
 * So use Keys,High Cardianility columns to the left side and timestamp, long string etc to the right of the _dataSkippingNumIndexedCols_ configyred values.
 * _dataSkippingStatsColumns_ (Databricks Runtime 13.3 LTS and above): Specify a list of column names for which Delta Lake collects statistics! _Supersedes dataSkippingNumIndexedCols_
 * The information for each file has 1) the file name 2)num of records in the file 3) min,max,null counts for the required columns
+**_Note_**: Parquet stores min/max statistics for row groups, but those are not stored inside the row groups themselves but in the file footer instead. As a result, if none of the row groups match, then it is not necessary to read any part of the file other than the footer. Whereas Delta lake stores the stats directly for file level (using the row group level details?).So the combination of file level stats from delta lake (which file to check) and the row group level information from those particular concerned parquet files (which row group to check now) gives the best search result!
+* Limitation: When we have say OR condition in the predicate with a column that can have overlapping values like say  balance. The same "balance amount" can spread across mutliple files causing scanning of almost all the files, then data stats does not work much. Basically unreated columns in the predicate can make data skipping ineffective.
+
+**Zordering**
+* To overcome the limitation of data skipping mentioned above, we have zordering.
+* Zordering gpoups multiple statistics into single dimention
+* Zordering organizes the data in such a way that makes the file skipping effective.
+* So in normal file level stats, we have say stats collected on ID and Balance amount. Now the min and max of the balance amount of each file will cause lots of overlapping values. Hence _where id= or balance=_ will lead to scanning of almost all the files
+* Now with ZORDER BY (id,balance) will collocate the related informtion (multi dimentional) in the same set of files.
+* Zorder Recommendations:
+    1) Commonly queries columns/join Keys should be used in Zorder columns
+    2) Only Zorder by columns that have collected stats (_dataSkippingNumIndexedCols_ or _dataSkippingStatsColumns_)
+    3) The effectiveness of Zordering drops with each added columns
+    4) Zorder always comes with Optimize command
+* Zorder only improves the data skipping. It does not give the perfact solution for 100% data skipping.
 
 
