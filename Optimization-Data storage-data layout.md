@@ -24,25 +24,28 @@ ii)Partition columns should have low cardianilty. Too many distinct values will 
 * Limitation: When we have say OR condition in the predicate with a column that can have overlapping values like say  balance. The same "balance amount" can spread across mutliple files causing scanning of almost all the files, then data stats does not work much. Basically unreated columns in the predicate can make data skipping ineffective.
 
 **Zordering**
+ CC: _https://www.linkedin.com/pulse/z-order-visualization-implementation-nick-karpov_; _https://www.youtube.com/watch?v=5t6wX28JC_M_ (_Delta Lake Deep Dive: Liquid Clustering_)
+
 * To overcome the limitation of data skipping mentioned above, we have zordering.
-* Zordering gpoups multiple statistics into single dimention
-* Zordering organizes the data in such a way that makes the file skipping effective.
-* So in normal file level stats, we have say stats collected on ID and Balance amount. Now the min and max of the balance amount of each file will cause lots of overlapping values. Hence _where id= or balance=_ will lead to scanning of almost all the files
-* Now with ZORDER BY (id,balance) will collocate the related informtion (multi dimentional) in the same set of files.
+* Z-Order in Delta Lake is a sort and repartition. Its actual behavior and implementation is to sort the data into buckets, and repartition the data according to those buckets. When we sort the data into buckets, we use a special kind of sorting that collocates, or places similar data into the same bucket.
+* Z-Order in Delta Lake is a heuristic, not an index. An index in a database is a data structure that provides a direct link to a single row of data for fast retrieval. Z-Order can indicate which files might have the required data, but cannot confirm exactly which file contains the exact required rows, like an index. So the query might still read files that don’t have the required data in order to guarantee the correct result.
+* In normal file level stats, we have say stats collected on ID and Balance amount. Now the min and max of the balance amount of each file will cause lots of overlapping values. Hence _where id= or balance=_ will lead to scanning of almost all the files
+* Now with ZORDER BY (id,balance) will collocate the related informtion (groups multiple statistics into single dimention) in the same set of files.
 * Zorder Recommendations:
     1) Commonly queries columns/join Keys should be used in Zorder columns
     2) Only Zorder by columns that have collected stats (_dataSkippingNumIndexedCols_ or _dataSkippingStatsColumns_)
-    3) The effectiveness of Zordering drops with each added columns
+    3) The effectiveness of Zordering drops with each added columns. And each column adds in the Zorder tries to eliminate the intersection for the respective columns. So more columns added means more dimensional points to be intersection free- which starts to become impossible/ineffective
     4) Zorder always comes with Optimize command
-* Zorder only improves the data skipping. It does not give the perfact solution for 100% data skipping.
+* Zorder only improves the data skipping. It does not give the perfact solution for 100% data skipping. (Best case scenario is no intersection- hence perfact data skipping)
+* To reduce itersection (reduce the skewness in the interleaved column genetrated for zorder), Delta Lake Spark connector implementation uses an additional noise column to reduce skew. This is enabled by default that adds one more column in addition to the user specified columns when producing the z-value, .
   ![image](https://github.com/srahman77/databrics/assets/58270885/936386a3-3fce-444c-8e5a-471890e25db4)
   ( credit: https://www.youtube.com/watch?v=5t6wX28JC_M)
-* In the above pic, we can see that 1st and last partition have overlapping ids. So it did not resolve the unwanted file scanning completely- but improved. e.g if we need any id between 35300 to 71000 0r any balance between 20000 and 30000, we need to scan only 2nd partition
+* In the above pic, we can see that 1st and last partition have overlapping ids. So it did not resolve the unwanted file scanning completely- but improved. e.g if we need any id between 35300 to 71000 0r any balance between 20000 and 30000, we need to scan only 2nd partition.
+* For DF:  df.optimize().executeZOrderBy("x","y")
+  For SQL: OPTIMIZE Detla_Table ZORDER BY ("x","y")
 
 * Zorder Limitation:
     1)Optimize Zorder By rewrites all the data - high write operation
     2)It runs as a single operation and there is no intermendiate checkpoints for failover recovery
-    3)No table level defination of Zorder. Hence everytime we run zorder, we need to provide the list of columns also.    
-  
-
+    3)No table level defination of Zorder. Hence everytime we run zorder, we need to provide the list of columns also.
 
