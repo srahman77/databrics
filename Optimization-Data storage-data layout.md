@@ -39,4 +39,10 @@ ii)Partition columns should have low cardianilty. Too many distinct values will 
   ( credit: https://www.youtube.com/watch?v=5t6wX28JC_M)
 * In the above pic, we can see that 1st and last partition have overlapping ids. So it did not resolve the unwanted file scanning completely- but improved. e.g if we need any id between 35300 to 71000 0r any balance between 20000 and 30000, we need to scan only 2nd partition
 
+* Zorder Limitation:
+    1)Optimize Zorder By rewrites all the data - high write operation
+    2)It runs as a single operation and there is no intermendiate checkpoints for failover recovery
+    3)No table level defination of Zorder. Hence everytime we run zorder, we need to provide the list of columns also.    
+  
+
 
