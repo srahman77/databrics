@@ -14,6 +14,6 @@
 * UC Metastore has a control plane that has the metadata about the the objects/ACLs. It also has Cloud storage tied to a region and the data related to the objects managed by the metastore is stored in the cloud storage .
 * The MD of both managed and external tables are managed by the metastore in the control plane. The data of the managed table is stored in the cloud storage associated with the metastore mentioned in the above point.
 * UC metastire has 5 componenet:
-    1. Catalog: A UC metastore can 1000 catalog( need to contact databricks team if more needed). Catalog has tables,views and functions
+    1. Catalog: A UC metastore can 1000 catalog( need to contact databricks team if more needed). Catalog has tables,views ,volumes,Models and functions
     2. 
   
