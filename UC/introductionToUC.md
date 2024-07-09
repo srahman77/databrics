@@ -1,4 +1,4 @@
-# Data Governance
+**Data Governance**
 * 4 key functionalities of data governance are:
   1. Data Access Control- Who has access to which data
   2. Data access audit- Capture and record all access to data
@@ -10,3 +10,6 @@
   * Before UC, databricks provided some level of access control, but the security model was permissive by default. It used to requre a carefull adminstration of access control list and the compute resources accessing the data to yield a secure solution. Also the ACLs were used to define as a property of the workspace, so sclaing the project to multi worskpace or multi cloud environment was a real challange. UC lives outside the workspace! So it spans workspace and clouds (__Unify governance accross clouds__).
   * Unify Data and AI assets: Centrally share,audit,secure and manage all data types. No need to replicate security settings across different systems. Also, UC can perform audits on any query on the data. Data lineage also captures and displayed for all tables
   * Unify existing catalogs without much hard work
+* UC metastore: Top level logical container in UC. It has the metadata about the objects that the metastore manages and the ACL that govern access to those objects.
+* UC Metastore has a control plane that has the metadata about the the objects/ACLs. It also has Cloud storage tied to a region and the data related to the objects managed by the metastore is stored in the cloud storage 
+  
