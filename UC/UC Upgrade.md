@@ -11,13 +11,13 @@ This is probably most important phase of UC upgrade
     3. Understand customer's pain point: Regarding existing governance methodologies (in other project cases, existing system/flow)
     4. Understand customer's need
     5. Get to know stakeholders and their processes
-  * We should make sure a check list of pre-requisites-
-     Customers:
-        1. No Hard blockers:
-        2. Identify administrator:
-        3. Cloud Account access:
-        4. Access to metastore: 
-        5. Idea of how permissions should look:
+* We should make sure a check list of pre-requisites-
+     * Customers:
+       1. No Hard blockers: Make sure no blockers from customer side that can derail the upgrade. e.g. in AWS, UC is not supported in single tenant databricks (needs E2). No such limitaions for Azure and GCP, but make sure if any new limitaion comes. Also, UC is supported in Premium and above. Standard tier does not support UC
+       2. Identify administrator:
+       3. Cloud Account access:
+       4. Access to metastore:
+       5. Idea of how permissions should look:
     
        
     
