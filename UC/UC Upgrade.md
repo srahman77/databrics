@@ -5,12 +5,26 @@ This is probably most important phase of UC upgrade
 * We undertand the customer's expectations
 * Agree on the deliverables
 * Set scope of work that can be achieved within the project constraints- typically the amount of money and time alloted to the project.
-* And we achieve the above by following tasks-
-    1. Meet the releavant personnel
-    2. Run UCX tool and review results
-    3. Understand customer's pain point
+* And we achieve the above by following tasks (actually this can be used for any new project)-
+    1. Meet the releavant personnel: Should be done before the engagement start date. Here the requirements should be crystallised and the defination of success id agreed upon
+    2. Run UCX tool and review results: This will help in discussion regarding the deliverables
+    3. Understand customer's pain point: Regarding existing governance methodologies (in other project cases, existing system/flow)
     4. Understand customer's need
     5. Get to know stakeholders and their processes
+  * We should make sure a check list of pre-requisites-
+     Customers:
+        1. No Hard blockers:
+        2. Identify administrator:
+        3. Cloud Account access:
+        4. Access to metastore: 
+        5. Idea of how permissions should look:
+    
+       
+    
+    
+       
+
+
 
   
      
