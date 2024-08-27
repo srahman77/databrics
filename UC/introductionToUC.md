@@ -10,3 +10,7 @@
   * Before UC, databricks provided some level of access control, but the security model was permissive by default. It used to requre a carefull adminstration of access control list and the compute resources accessing the data to yield a secure solution. Also the ACLs were used to define as a property of the workspace, so sclaing the project to multi worskpace or multi cloud environment was a real challange. UC lives outside the workspace! So it spans workspace and clouds (__Unify governance accross clouds__).
   * Unify Data and AI assets: Centrally share,audit,secure and manage all data types. No need to replicate security settings across different systems. Also, UC can perform audits on any query on the data. Data lineage also captures and displayed for all tables
   * Unify existing catalogs without much hard work
+
+* Legacy Data governance solution: Table access control and Azure Data Lake Storage credential passthrough (legacy data governance feature that allows you authenticate automatically to Azure Storage from Azure Databricks clusters using the same Microsoft Entra ID identity that you use to log into Azure Databricks-- what we used previously)
+* 
+* 
