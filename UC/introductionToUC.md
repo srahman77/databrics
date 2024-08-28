@@ -38,3 +38,20 @@ Data discovery: Unity Catalog lets you tag and document data assets, and provide
 ii)Create managed storage locations to store the managed tables and volumes in these catalogs and schemas. iii) Grant user access to catalogs, schemas, and database objects.
   * Workspaces that are automatically enabled for Unity Catalog provision a workspace catalog with broad privileges granted to all workspace users. This catalog is a convenient starting point for trying out Unity Catalog.
 
+# Migrating an existing workspace to Unity Catalog involves the following:
+  * Converting any workspace-local groups to account-level groups. Unity Catalog centralizes identity management at the account level.
+  * Migrating tables and views managed in Hive metastore to Unity Catalog.
+  * Update queries and jobs to reference the new Unity Catalog tables instead of the old Hive metastore tables.
+* Hive metastore table migration to UC: https://learn.microsoft.com/en-us/azure/databricks/data-governance/unity-catalog/migrate
+* To access data in Unity Catalog, clusters must be configured with the correct access mode. Unity Catalog is secure by default. If a cluster is not configured with shared or single-user access mode, the cluster can’t access data in Unity Catalog (Other access modes are no isolation shared and custom- these 2 does are not supported.)
+* Unity Catalog supports the following table formats:
+  * Managed tables must use the delta table format.
+  * External tables can use delta, CSV, JSON, avro, parquet, ORC, or text.
+ 
+* UC limitation:
+  * Bucketing is not supported for Unity Catalog tables. If you run commands that try to create a bucketed table in Unity Catalog, it will throw an exception.
+  * Writing to the same path or Delta Lake table from workspaces in multiple regions can lead to unreliable performance if some clusters access Unity Catalog and others do not.
+  * Custom partition schemes created using commands like ALTER TABLE ADD PARTITION are not supported for tables in Unity Catalog. But Unity Catalog can access tables that use directory-style partitioning.
+  * Unity Catalog manages partitions differently than Hive. Hive commands that directly manipulate partitions are not supported on tables managed by Unity Catalog.
+  * Table history is not migrated when you run CREATE TABLE CLONE. Any tables in the Hive metastore that you clone to Unity Catalog are treated as new tables. You cannot perform Delta Lake time travel or other operations that rely on pre-migration history.
+  * Unity Catalog enforces resource quotas on all securable objects. If you expect to exceed these resource limits, contact your Azure Databricks account team.. E.g table/schema=	10000; table/metastore=1000000 etc
