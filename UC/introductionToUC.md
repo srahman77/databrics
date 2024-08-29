@@ -109,4 +109,6 @@ ii)Create managed storage locations to store the managed tables and volumes in t
         CREATE TABLE users  (name STRING, ssn STRING);
         ALTER TABLE users ALTER COLUMN ssn SET MASK ssn_mask;
 * Use dynamic views if you need to apply transformation logic such as filters and masks to read-only tables, and if it is acceptable for users to refer to the dynamic views using different names. If you want to filter data when you share it using Delta Sharing, you must use dynamic views. Use row filters and column masks if you want to filter or compute expressions over specific data but still provide users access to the tables using their original names.
+
+  ## Refer the Databricks Docs for the other admin type of details. The above are the basic about UC**
     
