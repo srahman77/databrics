@@ -42,9 +42,11 @@ Data discovery: Unity Catalog lets you tag and document data assets, and provide
 # How do I set up Unity Catalog for my organization?
   * To use Unity Catalog, your Azure Databricks workspace must be enabled for Unity Catalog, which means that the workspace is attached to a Unity Catalog metastore
   * All new workspaces are enabled for Unity Catalog automatically upon creation, but older workspaces might require that an account admin enable Unity Catalog manually
+  * If your workspace was not enabled for Unity Catalog automatically, an account admin or metastore admin must manually attach the workspace to a Unity Catalog metastore in the same region. If no Unity Catalog metastore exists in the region, an account admin must create one
   * Whether or not your workspace was enabled for Unity Catalog automatically, the following steps are also required to get started with Unity Catalog: i)Create catalogs and schemas to contain database objects like tables and volumes.
 ii)Create managed storage locations to store the managed tables and volumes in these catalogs and schemas. iii) Grant user access to catalogs, schemas, and database objects.
   * Workspaces that are automatically enabled for Unity Catalog provision a workspace catalog with broad privileges granted to all workspace users. This catalog is a convenient starting point for trying out Unity Catalog.
+  * To run Unity Catalog workloads, compute resources must comply with certain security requirements.SQL warehouses always comply with Unity Catalog requirements, but some cluster access modes do not (only shared and single user do)
 
 # Migrating an existing workspace to Unity Catalog involves the following:
   * Converting any workspace-local groups to account-level groups. Unity Catalog centralizes identity management at the account level.
