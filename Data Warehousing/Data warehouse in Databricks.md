@@ -1,3 +1,11 @@
 * Data warehousing refers to collecting and storing data from multiple sources so it can be quickly accessed for business insights and reporting.
 * Databricks SQL is the collection of services that bring data warehousing capabilities and performance to your existing data lakes. Databricks SQL supports open formats and standard ANSI SQL
 * The data warehouse is modeled at the silver layer and feeds specialized data marts in the gold layer.
+* Refresh operrations for materialised views:
+    * Incremental refresh: An incremental refresh processes changes in the underlying data after the last refresh and then appends that data to the table. Depending on the base tables and included operations, only certain types of materialized views can be incrementally refreshed. When materialized views are created using a SQL warehouse or serverless Delta Live Tables pipeline, they are automatically incrementally refreshed if their queries are supported. If a query includes unsupported expressions for an incremental refresh, a full refresh will be performed, potentially resulting in additional costs.
+    * Full refresh: A full refresh truncates the table and reprocesses all data available in the source with the latest definition. It is not recommended to perform full refreshes on sources that don’t keep the entire data history or have short retention periods, such as Kafka, because the full refresh truncates the existing data. You may be unable to recover old data if the data is no longer available in the source.
+# Serverless SQL warehouses: 
+* Databricks SQL delivers optimal price and performance with serverless SQL warehouses. Key advantages of serverless warehouses over pro and classic models include:
+    * Instant and elastic compute: Eliminates waiting for infrastructure resources and avoids resource over-provisioning during usage spikes. Intelligent workload management dynamically handles scaling.
+    * Minimal management overhead: Capacity management, patching, upgrades, and performance optimization are all handled by Azure Databricks, simplifying operations and leading to predictable pricing.
+    * Lower total cost of ownership (TCO): Automatic provisioning and scaling of resources as needed helps avoid over-provisioning and reduces idle times, thus lowering TCO. 
