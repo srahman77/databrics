@@ -58,7 +58,7 @@ deltaTable.update(
   condition = col('gender') == 'M',
   set = { 'gender': lit('Male') }
 )
-* *https://learn.microsoft.com/en-us/azure/databricks/delta/tutorial* : for practice
+
 * Delete from a table:
 
   deltaTable = DeltaTable.forName(spark, "main.default.people_10m")
@@ -70,4 +70,41 @@ deltaTable.update(
   *Declare the predicate by using Spark SQL functions.*
 
    deltaTable.delete(col('birthDate') < '1960-01-01')
+* Display table history (s=describe history in sql):
 
+  deltaTable = DeltaTable.forName(spark, "main.default.people_10m")
+  display(deltaTable.history())
+* Query prev version:
+
+  deltaTable = DeltaTable.forName(spark, "main.default.people_10m")
+  deltaHistory = deltaTable.history()
+  display(deltaHistory.where("version == 0"))
+
+**Or:**
+
+  display(deltaHistory.where("timestamp == '2024-05-15T22:43:15.000+00:00'"))
+
+
+  To Create a DF from prev version:
+
+  df = spark.read.option('versionAsOf', 0).table("main.default.people_10m")
+  **Or:**
+  df = spark.read.option('timestampAsOf', '2024-05-15T22:43:15.000+00:00').table("main.default.people_10m")
+  display(df)
+
+* Optimize: After you have performed multiple changes to a table, you might have a lot of small files. To improve the speed of read queries, you can use the optimize operation to collapse small files into larger ones
+
+   deltaTable = DeltaTable.forName(spark, "main.default.people_10m")
+   deltaTable.optimize()
+
+* Zorder By:
+
+   deltaTable = DeltaTable.forName(spark, "main.default.people_10m")
+   deltaTable.optimize().executeZOrderBy("gender")
+
+*  Vacuum:
+    from delta.tables import *
+    deltaTable = DeltaTable.forName(spark, "main.default.people_10m")
+    deltaTable.vacuum()
+
+* *https://learn.microsoft.com/en-us/azure/databricks/delta/tutorial* : for practice
