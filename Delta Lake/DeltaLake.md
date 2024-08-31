@@ -31,8 +31,43 @@
   .whenNotMatchedInsertAll()
   .execute())*
 
-  we cannot directly use the target table(main.default.people_10m) in the merge, hence we use the 1st 2 steps to create a DeltaTable object for the target table and then appy merge on that table
-*
-*
+  we cannot directly use the target table(main.default.people_10m) in the merge, hence we use the 1st 2 steps to create a DeltaTable object for the target table and then appy merge on that table. For Spark SQl, we directly use the target table for merge like we do
+* Appendig data to a table: equivalent of insert into of sql in pyspark:
+
+  df.write.mode("append").saveAsTable("main.default.people_10m")
+
+  Use .mode("overwrite") for insert overwrite
+
+* Update in pyspark:
+
+  from delta.tables import *
+  from pyspark.sql.functions import *
+
+  deltaTable = DeltaTable.forName(spark, "main.default.people_10m")
+
+*Declare the predicate by using a SQL-formatted string.*
+
+deltaTable.update(
+  condition = "gender = 'F'",
+  set = { "gender": "'Female'" }
+)
+
+*Declare the predicate by using Spark SQL functions*
+
+deltaTable.update(
+  condition = col('gender') == 'M',
+  set = { 'gender': lit('Male') }
+)
 * *https://learn.microsoft.com/en-us/azure/databricks/delta/tutorial* : for practice
-* 
+* Delete from a table:
+
+  deltaTable = DeltaTable.forName(spark, "main.default.people_10m")
+
+  *Declare the predicate by using a SQL-formatted string.*
+
+   deltaTable.delete("birthDate < '1955-01-01'")
+
+  *Declare the predicate by using Spark SQL functions.*
+
+   deltaTable.delete(col('birthDate') < '1960-01-01')
+
