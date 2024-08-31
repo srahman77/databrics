@@ -45,19 +45,19 @@
 
   deltaTable = DeltaTable.forName(spark, "main.default.people_10m")
 
-*Declare the predicate by using a SQL-formatted string.*
+   *Declare the predicate by using a SQL-formatted string.*
 
-deltaTable.update(
-  condition = "gender = 'F'",
-  set = { "gender": "'Female'" }
-)
+   deltaTable.update(
+   condition = "gender = 'F'",
+   set = { "gender": "'Female'" }
+   )
 
-*Declare the predicate by using Spark SQL functions*
+  *Declare the predicate by using Spark SQL functions*
 
-deltaTable.update(
+  deltaTable.update(
   condition = col('gender') == 'M',
   set = { 'gender': lit('Male') }
-)
+  )
 
 * Delete from a table:
 
@@ -80,7 +80,7 @@ deltaTable.update(
   deltaHistory = deltaTable.history()
   display(deltaHistory.where("version == 0"))
 
-**Or:**
+  **Or:**
 
   display(deltaHistory.where("timestamp == '2024-05-15T22:43:15.000+00:00'"))
 
