@@ -106,5 +106,19 @@
     from delta.tables import *
     deltaTable = DeltaTable.forName(spark, "main.default.people_10m")
     deltaTable.vacuum()
+ 
+ * Some points on time travel:
+   * Data files are deleted when VACUUM runs against a table. Delta Lake manages log file removal automatically after checkpointing table versions.
+   * In order to increase the data retention threshold for Delta tables, you must configure the following table properties:
+      * *delta.logRetentionDuration = "interval <interval>"*: controls how long the history for a table is kept. The default is interval 30 days.
+      * *delta.deletedFileRetentionDuration = "interval <interval>"*: determines the threshold VACUUM uses to remove data files no longer referenced in the current table version. The default is interval 7 days.
+      * *spark.databricks.delta.retentionDurationCheck.enabled to false*: by default there is a safety interval enabled. So if you set a retentionperiod lower than that interval (7 days), data in that interval will not be deleted TO delete the data for less than 7 days, set the retentionDurationCheck to false.
+   * You need both the log and data files to time-travel to a previous version.
+
+     Vacuum - does not delete the log files. It only deletes the data files, which are never deleted automatically unless you run the vacuum. Log files are automatically cleaned up after new checkpoints are added.
+
+     logRetentionDuration - Each time a checkpoint is written, Databricks automatically cleans up log entries older than the retention interval. For *delta.logRetentionDuration'='interval  days’*, when a new checkpoint is written, it clears the logs older than 8 days. Once this happens, you should not be able to do time travel as log files are now unavailable for that version.
+     
+
 
 * *https://learn.microsoft.com/en-us/azure/databricks/delta/tutorial* : for practice
