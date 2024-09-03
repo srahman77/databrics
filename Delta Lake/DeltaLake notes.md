@@ -32,10 +32,10 @@
      *spark.databricks.delta.retentionDurationCheck.enabled to false.*
 # Liquid Clustering:
 * Delta Lake liquid clustering replaces table partitioning and ZORDER to simplify data layout decisions and optimize query performance.
-* Liquid clustering provides flexibility to redefine clustering keys without rewriting existing data, allowing data layout to evolve alongside analytic needs over time.
+* Liquid clustering provides flexibility to redefine clustering keys without rewriting existing data (e.g if you want to change the partition columns in a patiotoned table, you need to rewrite the whole table), allowing data layout to evolve alongside analytic needs over time.
 * Databricks recommends using Databricks Runtime 15.2 and above for all tables with liquid clustering enabled.
 * Row-level concurrency is generally available in Databricks Runtime 14.2 and above for all tables with deletion vectors enabled.
-* The following are examples of scenarios that benefit from Liquid Clustering:
+* The following are examples of scenarios that benefit from Liquid Clustering. So if hive style partition works fine and does not cause any of the below issues
     * Tables often filtered by high cardinality columns.
     * Tables with significant skew in data distribution.
     * Tables that grow quickly and require maintenance and tuning effort.
@@ -44,7 +44,7 @@
     * Tables where a typical partition key could leave the table with too many or too few partitions.
 * You can enable liquid clustering on an existing table or during table creation.
 * Clustering is not compatible with partitioning or ZORDER, and requires that you use Azure Databricks to manage all layout and optimization operations for data in your table.
-* After liquid clustering is enabled, run OPTIMIZE jobs as usual to incrementally cluster data, meaning that data is only rewritten as necessary to accommodate data that needs to be clustered. Data files with clustering keys that do not match data to be clustered are not rewritten.
+* After liquid clustering is enabled, run OPTIMIZE jobs as usual to incrementally cluster data, meaning that data is only rewritten as necessary to accommodate data that needs to be clustered (distributed and sorted). Data files with clustering keys that do not match data to be clustered are not rewritten.
 * For tables experiencing many updates or inserts, Databricks recommends scheduling an OPTIMIZE job every one or two hours. Because liquid clustering is incremental, most OPTIMIZE jobs for clustered tables run quickly.
 * Enabling LC:  CREATE TABLE table1(col0 int, col1 string) CLUSTER BY (col0); *alter* ALTER TABLE <table_name> CLUSTER BY (<clustering_columns>)
 * **Warning** :Tables created with liquid clustering enabled have numerous Delta table features enabled at creation and use Delta writer version 7 and reader version 3. Table protocol versions cannot be downgraded, and tables with clustering enabled are not readable by Delta Lake clients that do not support all enabled Delta reader protocol table features.
@@ -61,3 +61,26 @@
     * In Databricks Runtime 15.1 and below, clustering on write does not support source queries that include filters, joins, or aggregations.
     * Structured Streaming workloads do not support clustering-on-write.
     * You cannot create a table with liquid clustering enabled using a Structured Streaming write. You can use Structured Streaming to write data to an existing table with liquid clustering enabled.
+* **Even though Liquid clustering looks great, but do not simply replace the hive-based partition strategy by https://www.reddit.com/r/databricks/comments/1cyj7cz/worse_performance_of_liquid_clustering_vs/**
+
+# Making merge faster with LC (https://www.youtube.com/watch?v=yZmrpXJg-G8)
+* Cluster By the merge keys using LC
+* Key optimization in Merge:
+     * LC
+     * Deletion Vector
+     * Dynamic prunning
+
+  
+# answers from databricks communty
+* Liquid Clustering and Z-Ordering both use 100 GB ZCubes but differ in their optimization and performance characteristics. Liquid Clustering maintains ZCube IDs in the transaction log and optimizes data only within unclustered ZCubes, making it efficient for write-heavy operations with minimal reorganization. In contrast, Z-Ordering does not track ZCube IDs and reorganizes the entire table or partitions during optimization, which can result in heavier write operations but may offer better read performance. Liquid Clustering is ideal for scenarios with frequent updates, while Z-Ordering is suited for read-heavy workloads.
+* Suppose if we receive incremental data with some modifications to existing record and in this case whether existing clustered ZCubes will be re-organized again? : Technically, due to Delta Lake's history, on file-level you don't update existing files, you always create new ones. Hence already clusterd zcubes will not be clustered
+  *Now if we keep on receiving update/deletes for existing data, the size of the clustered zcubes will keep on decreasing resulting into changing the clustered zcube to partial zcubes* (
+zcubes can be partial of stable depending on min_cube_size (100 gb) config. zcubes target size (best-effort) can be tuned using target_cube_size(150gb). stable zcubes can be downgraded to partial if their size decrease to less than min_cube_size by delete (vacuum) operation)
+* LC improved query efficiency, but increased no of files. Why?
+     * Liquid clustering uses the Hilbert Curve, a continuous fractal space-filling curve, as a multi-dimensional clustering technique. It significantly improves data skipping over traditional ZORDER.
+     * Instead of partitioning data into fixed-size blocks (as in ZORDER), liquid clustering creates groups of files with Hilbert-clustered data, known as ZCubes. These ZCubes are produced by the same OPTIMIZE command.
+     * The file count can get icreased- this behaviour is expected due to the way liquid clustering works. When you optimize a table, it reorganizes the data into ZCubes(first time it will reorganize whole table- so there can be a sudden jump in file nos). Some files may be split or merged to form these ZCubes.
+     * If your data had skewed distributions (e.g., some values are more frequent than others), liquid clustering might create more files to evenly distribute the data.
+     * Despite the increased file count, query performance should improve due to better data skipping and locality.
+
+
