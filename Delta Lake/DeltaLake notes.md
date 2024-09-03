@@ -32,6 +32,8 @@
      *spark.databricks.delta.retentionDurationCheck.enabled to false.*
 # Liquid Clustering:
 * Delta Lake liquid clustering replaces table partitioning and ZORDER to simplify data layout decisions and optimize query performance.
+* You can say LC is an enhanced Zorder. LC uses an optimized hilbert curve and does better data layout then Zorder (this is not the only diff though)
+* Also, everytime you do optimization with zorder, it rewrites the whole table. And you have to keep on doing this optimiziation as after a few duration query will become slow. So its like a seesaw with zorder- full rewtrite-good performance-performance start to hit- full rewrite. LC avoids full rewrite. A stable Zcube will never get re-optimized 
 * Liquid clustering provides flexibility to redefine clustering keys without rewriting existing data (e.g if you want to change the partition columns in a patiotoned table, you need to rewrite the whole table), allowing data layout to evolve alongside analytic needs over time.
 * Databricks recommends using Databricks Runtime 15.2 and above for all tables with liquid clustering enabled.
 * Row-level concurrency is generally available in Databricks Runtime 14.2 and above for all tables with deletion vectors enabled.
@@ -47,6 +49,7 @@
 * After liquid clustering is enabled, run OPTIMIZE jobs as usual to incrementally cluster data, meaning that data is only rewritten as necessary to accommodate data that needs to be clustered (distributed and sorted). Data files with clustering keys that do not match data to be clustered are not rewritten.
 * For tables experiencing many updates or inserts, Databricks recommends scheduling an OPTIMIZE job every one or two hours. Because liquid clustering is incremental, most OPTIMIZE jobs for clustered tables run quickly.
 * Enabling LC:  CREATE TABLE table1(col0 int, col1 string) CLUSTER BY (col0); *alter* ALTER TABLE <table_name> CLUSTER BY (<clustering_columns>)
+* In upcoming release, *cluster by auto* will be available which will pick the cluster columns automatically based on the workload
 * **Warning** :Tables created with liquid clustering enabled have numerous Delta table features enabled at creation and use Delta writer version 7 and reader version 3. Table protocol versions cannot be downgraded, and tables with clustering enabled are not readable by Delta Lake clients that do not support all enabled Delta reader protocol table features.
 * Choose clustering keys: Databricks recommends choosing clustering keys based on commonly used query filters. Clustering keys can be defined in any order. If two columns are correlated, you only need to add one of them as a clustering key. You can specify up to 4 columns as clustering keys. You can only specify columns with statistics collected for clustering keys.
 * If you’re converting an existing table, consider the following recommendations:
@@ -61,17 +64,35 @@
     * In Databricks Runtime 15.1 and below, clustering on write does not support source queries that include filters, joins, or aggregations.
     * Structured Streaming workloads do not support clustering-on-write.
     * You cannot create a table with liquid clustering enabled using a Structured Streaming write. You can use Structured Streaming to write data to an existing table with liquid clustering enabled.
-* **Even though Liquid clustering looks great, but do not simply replace the hive-based partition strategy by https://www.reddit.com/r/databricks/comments/1cyj7cz/worse_performance_of_liquid_clustering_vs/**
+* *Even though Liquid clustering looks great, but do not simply replace the hive-based partition strategy by https://www.reddit.com/r/databricks/comments/1cyj7cz/worse_performance_of_liquid_clustering_vs/*
+* Problem with Partition tables: Hard to configure correctly
+     * over partitioning- Too many small files
+     * under partitioning- NO skipping benifits
+     * Skewed Partition
 
-# Making merge faster with LC (https://www.youtube.com/watch?v=yZmrpXJg-G8)
-* Cluster By the merge keys using LC
+Even if you setup correctly, in real life you will still end up with too huge files or too many small files per partition. And you have to run optimize to get better performance. ButIf you can setup the partition table correctly- then yeah- go for it!!  
+* Partition vs LC quick comp
+  ![image](https://github.com/user-attachments/assets/39b1bd98-56dc-45e5-ba00-aa690fe8a133)
+
+* Concurrency used to work only in partitioned table and you have to add a filter condition saying which partition a particular merge would be running. In LC, concurrency works from out of the box- no filter column needed
+* DBR 14.2+ allows row level locking- so better concurrency
+**Making merge faster with LC (https://www.youtube.com/watch?v=yZmrpXJg-G8)**
 * Key optimization in Merge:
-     * LC
+     * LC (Cluster By the merge keys using LC)
      * Deletion Vector
-     * Dynamic prunning
+     * Dynamic File prunning (DFP)
+     * Bloom filter join: Create a bloom filter (bitmap) from source table (with the joined columns' values) and share it accross the worker nodes which are reading the target files. Then this filter selects only the rows that will have the maching rows (values) and those only gets transfered over network(shuffled) for final joining
+* cluster by (merge_keys)- this enables DFP and *turns on deletion vector automatically!!*
+
+**How merge works**
+* Find the files of the target table that matches the keys
+* join these particular files on the kesy with source tables and apply the changes (updates,deletes)
+* Commit changes- here the older matcing files will be deleted as new files gets created with insreted records along with the updates and deleted records.
+
+**Optimization on Merge**
 
   
-# answers from databricks communty
+ **answers from databricks communty**
 * Liquid Clustering and Z-Ordering both use 100 GB ZCubes but differ in their optimization and performance characteristics. Liquid Clustering maintains ZCube IDs in the transaction log and optimizes data only within unclustered ZCubes, making it efficient for write-heavy operations with minimal reorganization. In contrast, Z-Ordering does not track ZCube IDs and reorganizes the entire table or partitions during optimization, which can result in heavier write operations but may offer better read performance. Liquid Clustering is ideal for scenarios with frequent updates, while Z-Ordering is suited for read-heavy workloads.
 * Suppose if we receive incremental data with some modifications to existing record and in this case whether existing clustered ZCubes will be re-organized again? : Technically, due to Delta Lake's history, on file-level you don't update existing files, you always create new ones. Hence already clusterd zcubes will not be clustered
   *Now if we keep on receiving update/deletes for existing data, the size of the clustered zcubes will keep on decreasing resulting into changing the clustered zcube to partial zcubes* (
