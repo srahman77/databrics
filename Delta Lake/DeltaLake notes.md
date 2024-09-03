@@ -31,9 +31,15 @@
 
      *spark.databricks.delta.retentionDurationCheck.enabled to false.*
 # Liquid Clustering:
+* LC dbricks design doc https://docs.google.com/document/d/1FWR3odjOw4v4-hjFy_hVaNdxHVs4WuK1asfB6M6XEMw/edit
 * Delta Lake liquid clustering replaces table partitioning and ZORDER to simplify data layout decisions and optimize query performance.
 * You can say LC is an enhanced Zorder. LC uses an optimized hilbert curve and does better data layout then Zorder (this is not the only diff though)
-* Also, everytime you do optimization with zorder, it rewrites the whole table. And you have to keep on doing this optimiziation as after a few duration query will become slow. So its like a seesaw with zorder- full rewtrite-good performance-performance start to hit- full rewrite. LC avoids full rewrite. A stable Zcube will never get re-optimized 
+* Why is the Z-curve worse than Hilbert? The Hilbert curve gives us a nice property that
+adjacent points on the curve always have a distance of 1.The Z-curve doesn’t have this
+property. Z-curve’s adjacent points don’t always have distance = 1 and it has large jumps in
+the curve.
+* Also, everytime you do optimization with zorder, it rewrites the whole table (even if no new files have been
+added since the last time). And you have to keep on doing this optimiziation as after a few duration query will become slow. So its like a seesaw with zorder- full rewtrite-good performance-performance start to hit- full rewrite. LC avoids full rewrite. A stable Zcube will never get re-optimized 
 * Liquid clustering provides flexibility to redefine clustering keys without rewriting existing data (e.g if you want to change the partition columns in a patiotoned table, you need to rewrite the whole table), allowing data layout to evolve alongside analytic needs over time.
 * Databricks recommends using Databricks Runtime 15.2 and above for all tables with liquid clustering enabled.
 * Row-level concurrency is generally available in Databricks Runtime 14.2 and above for all tables with deletion vectors enabled.
@@ -58,6 +64,8 @@
   ![image](https://github.com/user-attachments/assets/ade8d98b-6e84-47ca-8fd6-e84446e0263d)
 * Because not all operations apply (trigger) liquid clustering, Databricks recommends frequently running OPTIMIZE to ensure that all data is efficiently clustered.
 * You can change clustering keys for a table at any time by running an ALTER TABLE command. When you change clustering keys, subsequent OPTIMIZE and write operations use the new clustering approach, but existing data is *not rewritten*.
+* The clustering columns are persisted in *AddFile* using the ZCUBE_ZORDER_BY tag to indicate which clustering columns these files are clustered to. When picking candidate files, dbricks filter out files with a different set of clustering columns.
+* LC does not allow dropping clustering columns, but users can always do ALTER TABLE CLUSTER BY to move columns out of the clustering columns and then drop them.
 * You can also turn off clustering by setting the keys to NONE, as in the following example: ALTER TABLE table_name CLUSTER BY NONE;
 * Setting cluster keys to NONE does not rewrite data that has already been clustered, but prevents future OPTIMIZE operations from using clustering keys.
 * Limitations:
@@ -89,9 +97,6 @@ Even if you setup correctly, in real life you will still end up with too huge fi
 * join these particular files on the kesy with source tables and apply the changes (updates,deletes)
 * Commit changes- here the older matcing files will be deleted as new files gets created with insreted records along with the updates and deleted records.
 
-**Optimization on Merge**
-
-  
  **answers from databricks communty**
 * Liquid Clustering and Z-Ordering both use 100 GB ZCubes but differ in their optimization and performance characteristics. Liquid Clustering maintains ZCube IDs in the transaction log and optimizes data only within unclustered ZCubes, making it efficient for write-heavy operations with minimal reorganization. In contrast, Z-Ordering does not track ZCube IDs and reorganizes the entire table or partitions during optimization, which can result in heavier write operations but may offer better read performance. Liquid Clustering is ideal for scenarios with frequent updates, while Z-Ordering is suited for read-heavy workloads.
 * Suppose if we receive incremental data with some modifications to existing record and in this case whether existing clustered ZCubes will be re-organized again? : Technically, due to Delta Lake's history, on file-level you don't update existing files, you always create new ones. Hence already clusterd zcubes will not be clustered
