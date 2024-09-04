@@ -130,5 +130,19 @@ zcubes can be partial of stable depending on min_cube_size (100 gb) config. zcub
    * CREATE TABLE target_table SHALLOW CLONE source_table VERSION AS OF version;
    * CREATE TABLE target_table SHALLOW CLONE source_table TIMESTAMP AS OF timestamp_expression; -- timestamp can be like “2019-01-01” or like date_sub(current_date(), 1)
 * You can sync deep clones incrementally to maintain an updated state of a source table for disaster recovery (check more on it)
+* You can only clone Unity Catalog managed tables to Unity Catalog managed tables and Unity Catalog external tables to Unity Catalog external tables. VACUUM behavior differs between managed and external tables.
+* For managed UC tables, VACUUM operations against either the source or target of a shallow clone operation might delete data files from the source table.
+* For external tables, VACUUM operations only remove data files from the source table when run against the source table.
+* Only data files not considered valid for the source table or any shallow clone against the source are removed.
+* If multiple shallow clones are defined against a single source table, running VACUUM on any of the cloned tables does not remove valid data files for other cloned tables.
+* You cannot share shallow clones using Delta Sharing(In UC).
+* You cannot nest shallow clones, meaning you cannot make a shallow clone from a shallow clone.
+* For managed tables, dropping the source table breaks the target table for shallow clones. Data files backing external tables are not removed by DROP TABLE operations, and so shallow clones of external tables are not impacted by dropping the source.
+* Unity Catalog allows users to UNDROP managed tables for around 7 days after a DROP TABLE command. In Databricks Runtime 13.3 LTS and above, managed shallow clones based on a dropped managed table continue to work during this 7 day period. If you do not UNDROP the source table in this window, the shallow clone stops functioning once the source table’s data files are garbage collected.
+
+# Data Skipping:
+* delta.dataSkippingNumIndexedCols: Increase or decrease the number of columns on which Delta collects statistics. Depends on column order
+* delta.dataSkippingStatsColumns: Specify a list of column names for which Delta Lake collects statistics. Supersedes dataSkippingNumIndexedCols.
+* 
 
 
