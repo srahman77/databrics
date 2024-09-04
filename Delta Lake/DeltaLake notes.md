@@ -143,6 +143,10 @@ zcubes can be partial of stable depending on min_cube_size (100 gb) config. zcub
 # Data Skipping:
 * delta.dataSkippingNumIndexedCols: Increase or decrease the number of columns on which Delta collects statistics. Depends on column order
 * delta.dataSkippingStatsColumns: Specify a list of column names for which Delta Lake collects statistics. Supersedes dataSkippingNumIndexedCols.
+* Updating this property does not automatically recompute statistics for existing data. Rather, it impacts the behavior of future statistics collection when adding or updating data in the table.
+* In Databricks Runtime 14.3 LTS and above, you can manually trigger the recomputation of statistics for a Delta table using the following command:
+     *ANALYZE TABLE table_name COMPUTE DELTA STATISTICS*
+* Long strings are truncated during statistics collection. You might choose to exclude long string columns from statistics collection, especially if the columns aren’t used frequently for filtering queries.
 * 
 
 
