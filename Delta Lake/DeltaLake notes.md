@@ -30,14 +30,18 @@
 * To run vacuum on a table for lesst than the retention duration, we need to disable the below safety config
 
      *spark.databricks.delta.retentionDurationCheck.enabled to false.*
+
+# Optimize:
+* Bin-packing optimization is idempotent, meaning that if it is run twice on the same dataset, the second run has no effect.
+* Bin-packing aims to produce evenly-balanced data files with respect to their size on disk, but not necessarily number of tuples per file. However, the two measures are most often correlated.
+* Optimize type : Bin-packing and Z-ordering. ( Bin Packing is defined as the placement of a set of different-sized items into identical bins so that the number of bins used is minimized) 
+  
 # Liquid Clustering:
 * LC dbricks design doc https://docs.google.com/document/d/1FWR3odjOw4v4-hjFy_hVaNdxHVs4WuK1asfB6M6XEMw/edit
 * Delta Lake liquid clustering replaces table partitioning and ZORDER to simplify data layout decisions and optimize query performance.
 * You can say LC is an enhanced Zorder. LC uses an optimized hilbert curve and does better data layout then Zorder (this is not the only diff though)
-* Why is the Z-curve worse than Hilbert? The Hilbert curve gives us a nice property that
-adjacent points on the curve always have a distance of 1.The Z-curve doesn’t have this
-property. Z-curve’s adjacent points don’t always have distance = 1 and it has large jumps in
-the curve.
+* Why is the Z-curve worse than Hilbert? The HiBin-packing aims to produce evenly-balanced data files with respect to their size on disk, but not necessarily number of tuples per file. However, the two measures are most often correlated.Hillbert curve gives us a nice property that adjacent points on the curve always have a distance of 1.The Z-curve doesn’t have this
+property. Z-curve’s adjacent points don’t always have distance = 1 and it has large jumps in the curve.
 * Also, everytime you do optimization with zorder, it rewrites the whole table (even if no new files have been
 added since the last time). And you have to keep on doing this optimiziation as after a few duration query will become slow. So its like a seesaw with zorder- full rewtrite-good performance-performance start to hit- full rewrite. LC avoids full rewrite. A stable Zcube will never get re-optimized 
 * Liquid clustering provides flexibility to redefine clustering keys without rewriting existing data (e.g if you want to change the partition columns in a patiotoned table, you need to rewrite the whole table), allowing data layout to evolve alongside analytic needs over time.
@@ -108,5 +112,23 @@ zcubes can be partial of stable depending on min_cube_size (100 gb) config. zcub
      * The file count can get icreased- this behaviour is expected due to the way liquid clustering works. When you optimize a table, it reorganizes the data into ZCubes(first time it will reorganize whole table- so there can be a sudden jump in file nos). Some files may be split or merged to form these ZCubes.
      * If your data had skewed distributions (e.g., some values are more frequent than others), liquid clustering might create more files to evenly distribute the data.
      * Despite the increased file count, query performance should improve due to better data skipping and locality.
+ 
+# Cloning in Delta Table:
+* Create a copy of an existing Delta Lake table on Azure Databricks at a specific version using the clone command
+* Clones can be either deep or shallow.
+* A deep clone is a clone that copies the source table data to the clone target in addition to the metadata of the existing table. Additionally, stream metadata is also cloned such that a stream that writes to the Delta table can be stopped on a source table and continued on the target of a clone from where it left off. For deep clones only, stream and COPY INTO metadata are also cloned. Metadata not cloned are the table Shallow clones reference data files in the source directory. If you run vacuum on the source table, clients can no longer read the referenced data files and a FileNotFoundException is thrown. In this case, running clone with replace over the shallow clone repairs the clone. If this occurs often, consider using a deep clone instead which does not depend on the source table. and user-defined commit metadata.
+* A shallow clone is a clone that does not copy the data files to the clone target. The table metadata is equivalent to the source. These clones are cheaper to create. The metadata that is cloned includes: schema, partitioning information, invariants, nullability.
+* Any changes made to either deep or shallow clones affect only the clones themselves and not the source table.
+* Shallow clones reference data files in the source directory. If you run vacuum on the source table, clients can no longer read the referenced data files and a FileNotFoundException is thrown. In this case, running clone with replace over the shallow clone repairs the clone. If this occurs often, consider using a deep clone instead which does not depend on the source table.
+* Cloning with *replace* to a target that already has a table at that path creates a Delta log if one does not exist at that path. You can clean up any existing data by running vacuum.
+* For existing Delta tables, a new commit is created that includes the new metadata and new data from the source table. This new commit is incremental, meaning that only new changes since the last clone are committed to the table.
+* Syntax:
+   * CREATE TABLE target_table CLONE source_table; -- Create a deep clone of source_table as target_table
+   * CREATE OR REPLACE TABLE target_table CLONE source_table; -- Replace the target
+   * CREATE TABLE IF NOT EXISTS target_table CLONE source_table; -- No-op if the target table exists
+   * CREATE TABLE target_table SHALLOW CLONE source_table;
+   * CREATE TABLE target_table SHALLOW CLONE source_table VERSION AS OF version;
+   * CREATE TABLE target_table SHALLOW CLONE source_table TIMESTAMP AS OF timestamp_expression; -- timestamp can be like “2019-01-01” or like date_sub(current_date(), 1)
+* You can sync deep clones incrementally to maintain an updated state of a source table for disaster recovery (check more on it)
 
 
