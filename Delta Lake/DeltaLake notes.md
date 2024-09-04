@@ -33,7 +33,7 @@
 
 # Optimize:
 * Bin-packing optimization is idempotent, meaning that if it is run twice on the same dataset, the second run has no effect.
-* Bin-packing aims to produce evenly-balanced data files with respect to their size on disk, but not necessarily number of tuples per file. However, the two measures are most often correlated.
+* Bin-packing aims to produce evenly-balanced data files with respect to their size on disk, but not necessarily number of tuples per file. However, the two measures are most often correlated. (on the other hand, Z-ordering aims to produce evenly-balanced data files with respect to the number of tuples, but not necessarily data size on disk)
 * Optimize type : Bin-packing and Z-ordering. ( Bin Packing is defined as the placement of a set of different-sized items into identical bins so that the number of bins used is minimized) 
   
 # Liquid Clustering:
@@ -147,6 +147,14 @@ zcubes can be partial of stable depending on min_cube_size (100 gb) config. zcub
 * In Databricks Runtime 14.3 LTS and above, you can manually trigger the recomputation of statistics for a Delta table using the following command:
      *ANALYZE TABLE table_name COMPUTE DELTA STATISTICS*
 * Long strings are truncated during statistics collection. You might choose to exclude long string columns from statistics collection, especially if the columns aren’t used frequently for filtering queries.
-* 
 
+# Change Data Feed (Go through while learning staructured streaming)
 
+# Constraints on Az Databricks:
+* Azure Databricks supports standard SQL constraint management clauses. All constraints on Azure Databricks require Delta Lake (Delta Live Tables has a similar concept known as expectations). Constraints fall into two categories:
+     * Enforced contraints ensure that the quality and integrity of data added to a table is automatically verified.
+     * Informational primary key and foreign key constraints encode relationships between fields in tables and are not enforced.
+* **Enforced contraints**: When a constraint is violated, the transaction fails with an error. Two types of constraints are supported:
+     * NOT NULL: indicates that values in specific columns cannot be null.
+     * CHECK: indicates that a specified boolean expression must be true for each input row.
+     * 
