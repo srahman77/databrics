@@ -28,6 +28,8 @@ ii)Partition columns should have low cardianilty. Too many distinct values will 
 
 * To overcome the limitation of data skipping mentioned above, we have zordering.
 * Z-Order in Delta Lake is a sort and repartition. Its actual behavior and implementation is to sort the data into buckets, and repartition the data according to those buckets. When we sort the data into buckets, we use a special kind of sorting that collocates, or places similar data into the same bucket.
+* Z-ordering is not idempotent but aims to be an incremental operation. The time it takes for Z-ordering is not guaranteed to reduce over multiple runs. However, if no new data was added to a partition that was just Z-ordered, another Z-ordering of that partition will not have any effect.
+* Z-ordering aims to produce evenly-balanced data files with respect to the number of tuples, but not necessarily data size on disk
 * Z-Order in Delta Lake is a heuristic, not an index. An index in a database is a data structure that provides a direct link to a single row of data for fast retrieval. Z-Order can indicate which files might have the required data, but cannot confirm exactly which file contains the exact required rows, like an index. So the query might still read files that don’t have the required data in order to guarantee the correct result.
 * In normal file level stats, we have say stats collected on ID and Balance amount. Now the min and max of the balance amount of each file will cause lots of overlapping values. Hence _where id= or balance=_ will lead to scanning of almost all the files
 * Now with ZORDER BY (id,balance) will collocate the related informtion (groups multiple statistics into single dimention) in the same set of files.
