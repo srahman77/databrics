@@ -156,5 +156,10 @@ zcubes can be partial of stable depending on min_cube_size (100 gb) config. zcub
      * Informational primary key and foreign key constraints encode relationships between fields in tables and are not enforced.
 * **Enforced contraints**: When a constraint is violated, the transaction fails with an error. Two types of constraints are supported:
      * NOT NULL: indicates that values in specific columns cannot be null.
+         * CREATE TABLE people10m (id INT NOT NULL, ssn STRING, salary INT);
+         * ALTER TABLE people10m ALTER COLUMN middleName DROP NOT NULL;
+         * ALTER TABLE people10m ALTER COLUMN ssn SET NOT NULL;
+         * Before adding a NOT NULL constraint to a table, Azure Databricks verifies that all existing rows satisfy the constraint.
+         * If you specify a NOT NULL constraint on a column nested within a struct, the parent struct must also be not null. Columns nested within array or map types do not accept NOT NULL constraints.
      * CHECK: indicates that a specified boolean expression must be true for each input row.
      * 
