@@ -184,3 +184,4 @@ zcubes can be partial of stable depending on min_cube_size (100 gb) config. zcub
         > CREATE TABLE orders(orderid BIGINT NOT NULL CONSTRAINT orders_pk PRIMARY KEY,
                       customerid STRING CONSTRAINT orders_customers_fk REFERENCES customers);
 
+# Delta Best Practices:
