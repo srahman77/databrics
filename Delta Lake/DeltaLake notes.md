@@ -162,4 +162,25 @@ zcubes can be partial of stable depending on min_cube_size (100 gb) config. zcub
          * Before adding a NOT NULL constraint to a table, Azure Databricks verifies that all existing rows satisfy the constraint.
          * If you specify a NOT NULL constraint on a column nested within a struct, the parent struct must also be not null. Columns nested within array or map types do not accept NOT NULL constraints.
      * CHECK: indicates that a specified boolean expression must be true for each input row.
-     * 
+         * You manage CHECK constraints using the ALTER TABLE ADD CONSTRAINT and ALTER TABLE DROP CONSTRAINT commands. ALTER TABLE ADD CONSTRAINT verifies that all existing rows satisfy the constraint before adding it to the table.
+         *  ALTER TABLE people10m ADD CONSTRAINT dateWithinRange CHECK (birthDate > '1900-01-01');
+
+            ALTER TABLE people10m DROP CONSTRAINT dateWithinRange;
+* **PK and FKs**:
+     * Primary key and foreign key constraints are available in Databricks Runtime 11.3 LTS and above, and are fully GA in Databricks Runtime 15.2 and above.
+     * Primary key and foreign key constraints require Unity Catalog and Delta Lake. Primary and foreign keys are informational only and are not enforced. Foreign keys must reference a primary key in another table.
+     *  Create a table with a primary key
+        > CREATE TABLE persons(first_name STRING NOT NULL, last_name STRING NOT NULL, nickname STRING,
+                       CONSTRAINT persons_pk PRIMARY KEY(first_name, last_name));
+
+        create a table with a foreign key
+        > CREATE TABLE pets(name STRING, owner_first_name STRING, owner_last_name STRING,
+                    CONSTRAINT pets_persons_fk FOREIGN KEY (owner_first_name, owner_last_name) REFERENCES persons);
+
+        Create a table with a single column primary key and system generated name
+        > CREATE TABLE customers(customerid STRING NOT NULL PRIMARY KEY, name STRING);
+
+        Create a table with a names single column primary key and a named single column foreign key
+        > CREATE TABLE orders(orderid BIGINT NOT NULL CONSTRAINT orders_pk PRIMARY KEY,
+                      customerid STRING CONSTRAINT orders_customers_fk REFERENCES customers);
+
