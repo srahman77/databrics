@@ -185,3 +185,17 @@ zcubes can be partial of stable depending on min_cube_size (100 gb) config. zcub
                       customerid STRING CONSTRAINT orders_customers_fk REFERENCES customers);
 
 # Delta Best Practices:
+* When deleting and recreating a table in the same location, you should always use a CREATE OR REPLACE TABLE statement as dropping-recreating can result in unexpected results for concurrent operations.
+* In *Create Or Replace* the table history is maintained during the atomic data replacement, concurrent transactions can validate the version of the source table referenced, and therefore fail or reconcile concurrent transactions as necessary without introducing unexpected behavior or results.
+* DROP TABLE has different semantics depending on the type of table and whether the table is registered to Unity Catalog or the legacy Hive metastore.
+  ![image](https://github.com/user-attachments/assets/5344fb8d-609b-4c59-979c-487e0fa651cd)
+*  Unity Catalog maintains a history of Delta tables using an internal table ID
+*  CREATE OR REPLACE TABLE has the same semantics regardless of the table type or metastore in use. The following are important advantages of CREATE OR REPLACE TABLE:
+     * Table contents are replaced, but the table identity is maintained.
+     * The table history is retained, and you can revert the table to an earlier version with the RESTORE command.
+     * The operation is a single transaction, so there is never a time when the table doesn’t exist.
+     * Concurrent queries reading from the table can continue without interruption. Because the version before and after replacement still exists in the table history, concurrent queries can reference either version of the table as necessary.
+* Replace the content or schema of a table:
+     * Sometimes you may want to replace a Delta table. For example:You discover the data in the table is incorrect and want to replace the content. Or You want to rewrite the whole table to do incompatible schema changes
+     * While you can delete the entire directory of a Delta table and create a new table on the same path, it’s not recommended because:
+
