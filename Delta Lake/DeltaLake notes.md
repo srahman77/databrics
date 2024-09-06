@@ -198,4 +198,20 @@ zcubes can be partial of stable depending on min_cube_size (100 gb) config. zcub
 * Replace the content or schema of a table:
      * Sometimes you may want to replace a Delta table. For example:You discover the data in the table is incorrect and want to replace the content. Or You want to rewrite the whole table to do incompatible schema changes
      * While you can delete the entire directory of a Delta table and create a new table on the same path, it’s not recommended because:
+          * Deleting a directory is not efficient. A directory containing very large files can take hours or even days to delete.
+          * You lose all of the content in the deleted files; it’s hard to recover if you delete the wrong table.
+          * The directory deletion is not atomic. While you are deleting the table a concurrent query reading the table can fail or see a partial table.
+     * If you don’t need to change the table schema, you can delete data from a Delta table and insert your new data, or update the table to fix the incorrect values.
+     * If you want to change the table schema, you can replace the whole table atomically:
+ 
+       REPLACE TABLE <your-table> AS SELECT ... -- Managed table
+
+       REPLACE TABLE <your-table> LOCATION "<your-table-path>" AS SELECT ... -- External table
+     * There are multiple benefits with this approach:
+          * Overwriting a table is much faster because it doesn’t need to list the directory recursively or delete any files.
+          * The old version of the table still exists. If you delete the wrong table you can easily retrieve the old data using time travel. See Work with Delta Lake table history.
+          * It’s an atomic operation. Concurrent queries can still read the table while you are deleting the table.
+          * Because of Delta Lake ACID transaction guarantees, if overwriting the table fails, the table will be in its previous state.
+
+
 
