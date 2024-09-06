@@ -201,10 +201,10 @@ zcubes can be partial of stable depending on min_cube_size (100 gb) config. zcub
           * Deleting a directory is not efficient. A directory containing very large files can take hours or even days to delete.
           * You lose all of the content in the deleted files; it’s hard to recover if you delete the wrong table.
           * The directory deletion is not atomic. While you are deleting the table a concurrent query reading the table can fail or see a partial table.
-     * If you don’t need to change the table schema, you can delete data from a Delta table and insert your new data, or update the table to fix the incorrect values.
-     * If you want to change the table schema, you can replace the whole table atomically:
+     * If you don’t need to change the table schema, you can delete data from a Delta table and insert your new data, or update the table to fix the incorrect values. Deletion removes the data from the latest version of the Delta table but does not remove it from the physical storage until the old versions are explicitly vacuumed.
+     * If you want to change the table schema, you can replace the whole table atomically. Delta lake supports the following schema changes: Adding new columns (at arbitrary positions),Reordering existing columns,Renaming existing columns
  
-       REPLACE TABLE <your-table> AS SELECT ... -- Managed table
+       REPLACE TABLE <your-table> AS SELECT ... -- Managed table (replace as in create or replace)
 
        REPLACE TABLE <your-table> LOCATION "<your-table-path>" AS SELECT ... -- External table
      * There are multiple benefits with this approach:
@@ -213,5 +213,8 @@ zcubes can be partial of stable depending on min_cube_size (100 gb) config. zcub
           * It’s an atomic operation. Concurrent queries can still read the table while you are deleting the table.
           * Because of Delta Lake ACID transaction guarantees, if overwriting the table fails, the table will be in its previous state.
 
+* Spark caching: Databricks does not recommend that you use Spark caching for the following reasons:
+     * You lose any data skipping that can come from additional filters added on top of the cached DataFrame.
+     * The data that gets cached might not be updated if the table is accessed using a different identifier.
 
 
