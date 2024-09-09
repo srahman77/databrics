@@ -238,7 +238,22 @@ zcubes can be partial of stable depending on min_cube_size (100 gb) config. zcub
 * When you enable Delta features on a table, the table protocol is automatically upgraded. Databricks recommends against changing the minReaderVersion and minWriterVersion table properties. Changing these table properties does not prevent protocol upgrade. Setting these values to a lower value does not downgrade the table.
 * Azure Databricks provides limited support for dropping table features. *Check on this whenever needed*
 
-  # Table Size:
+# Table Size:
   * The table size reported for tables backed by Delta Lake on Azure Databricks differs from the total size of corresponding file directories in cloud object storage
   * Table sizes reported in Azure Databricks through UIs and DESCRIBE commands refer to the total size of data files on disk for those files referenced in the current version of the Delta table.
   * The size of the table reported after OPTIMIZE is generally smaller than the size before OPTIMIZE runs, because the total size of data files referenced by the current table version decreases with data compaction.
+
+# Some notes on Merge:
+* There can be any number of whenMatched and whenNotMatched clauses.
+* whenMatched clauses can have at most one update and one delete action.
+* Each whenMatched clause can have an optional condition. If this clause condition exists, the update or delete action is executed for any matching source-target row pair only when the clause condition is true.
+* If there are multiple whenMatched clauses, then they are evaluated in the order they are specified. *All whenMatched clauses, except the last one, must have conditions*.
+* whenNotMatched clauses can have only the insert action
+* If there are multiple whenNotMatched clauses, then they are evaluated in the order they are specified. All whenNotMatched clauses, except the last one, must have conditions.
+* whenNotMatchedBySource clauses are executed when a target row does not match any source row based on the merge condition. e.g use case: you need to delete records from target table if the expected records did not come from source.
+* whenNotMatchedBySource clauses can specify delete and update actions.
+* If there are multiple whenNotMatchedBySource clauses, then they are evaluated in the order they are specified. All whenNotMatchedBySource clauses, except the last one, must have conditions.
+* (This for *update and not for delete*) By definition, whenNotMatchedBySource clauses do not have a source row to pull column values from, and so source columns can’t be referenced. For each column to be modified, you can either specify a literal or perform an action on the target column, such as SET target.deleted_count = target.deleted_count + 1.
+* A merge operation can fail if multiple rows of the source dataset match and the merge attempts to update the same rows of the target Delta table. According to the SQL semantics of merge, such an update operation is ambiguous as it is unclear which source row should be used to update the matched target row.
+
+# Delta table properties reference:
