@@ -257,3 +257,20 @@ zcubes can be partial of stable depending on min_cube_size (100 gb) config. zcub
 * A merge operation can fail if multiple rows of the source dataset match and the merge attempts to update the same rows of the target Delta table. According to the SQL semantics of merge, such an update operation is ambiguous as it is unclear which source row should be used to update the matched target row.
 
 # Delta table properties reference:
+* Delta Lake reserves Delta table properties starting with delta.
+* All operations that set or update table properties conflict with other concurrent write operations, causing them to fail. Databricks recommends you modify a table property only when there are no concurrent write operations on the table.
+* **How do table properties and SparkSession properties interact?**
+     * Delta Lake reserves Delta table properties starting with delta.
+     * Delta table properties are set per table. If a property is set on a table, then this is the setting that is followed by default.
+     * Some table properties have associated SparkSession configurations which always take precedence over table properties. Some examples include the spark.databricks.delta.autoCompact.enabled and spark.databricks.delta.optimizeWrite.enabled configurations, which turn on auto compaction and optimized writes at the SparkSession level rather than the table level. Databricks recommends using table-scoped configurations for most workloads.
+     * For every Delta table property you can set a default value for new tables using a SparkSession configuration, overriding the built-in default. This setting only affects new tables and does not override or replace properties set on existing tables. The prefix used in the SparkSession is different from the configurations used in the table properties, as shown in the following table:
+       ![image](https://github.com/user-attachments/assets/ce3d2a1a-dbed-40b5-acfd-f4d49f231f75)
+     * Refer https://learn.microsoft.com/en-us/azure/databricks/delta/table-properties for available delta properties
+
+* AutoCompat, OptimizeWrite, Optimise:
+     * Optimized Write combines many small writes to the same partition into one larger write operation. It is an optimization performed before the data is written to your Delta table(so describe hist will not show it). Auto Compaction combines many small files into larger, more efficient files. 
+     * Optimized writes are most effective for partitioned tables, as they reduce the number of small files written to each partition by adding another layer of shuffles. Auto optimize will try to create files of 128 MB within each partition. On the other hand, explicit optimize will compress more and create files of 1 GB each (default value).
+     * Auto Compaction is only triggered for partitions or tables that have at least a certain number of small files. *spark.databricks.delta.autoCompact.minNumFiles*. Default 50. Default o/p file size 128 mb
+     * Auto compaction occurs after a write to a table has succeeded and runs synchronously on the cluster that has performed the write. So the write time could increase.
+     * Why need auto compaction if optimize write was used?  When you are writing frequent small updates to a table. In this case, the files will still be small, even after an Optimized Write.
+     * ![image](https://github.com/user-attachments/assets/10a58946-7d51-40cc-8059-81ab1e68653d)
