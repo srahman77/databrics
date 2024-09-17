@@ -358,3 +358,48 @@ PARTITIONED BY (eventType, eventDate)*
      * Reordering existing columns
      * Renaming existing columns
      * You can make these changes explicitly using DDL or implicitly using DML. An update to a Delta table schema is an operation that conflicts with all concurrent Delta write operations.
+ * You can change a column’s type or name or drop a column by rewriting the table.
+
+# Enable schema evolution: 
+* You can enable schema evolution by doing one of the following:
+   * Set the .option("mergeSchema", "true") to a Spark DataFrame write or writeStream operation.
+   * Use MERGE WITH SCHEMA EVOLUTION syntax.
+   * Set the Spark conf spark.databricks.delta.schema.autoMerge.enabled to true for the current SparkSession.
+* Databricks recommends enabling schema evolution for each write operation rather than setting a Spark conf. When you use options or syntax to enable schema evolution in a write operation, this takes precedence over the Spark conf.
+* Enable schema evolution for writes to add new columns:
+      * Columns that are present in the source query but missing from the target table are automatically added as part of a write transaction when schema evolution is enabled
+      * New columns are added to the end of the table schema
+      * A column in the target table is not present in the source table. The target schema is left unchanged; the values in the additional target column are either left unchanged (for UPDATE) or set to NULL (for INSERT).
+* Merge schema evolution:
+
+   MERGE WITH SCHEMA EVOLUTION INTO target
+USING source
+ON source.key = target.key
+WHEN MATCHED THEN
+  UPDATE SET *
+WHEN NOT MATCHED THEN
+  INSERT *
+WHEN NOT MATCHED BY SOURCE THEN
+* Dealing with NullType columns in schema updates: Because Parquet doesn’t support NullType, NullType columns are dropped from the DataFrame when writing into Delta tables, but are still stored in the schema. When a different data type is received for that column, Delta Lake merges the schema to the new data type. If Delta Lake receives a NullType for an existing column, the old schema is retained and the new column is dropped during the write.
+* By default, overwriting the data in a table does not overwrite the schema. When overwriting a table using mode("overwrite") without replaceWhere, you may still want to overwrite the schema of the data being written. You replace the schema and partitioning of the table by setting the overwriteSchema option to *true*
+
+# Type widening: This feature is in Public Preview in Databricks Runtime 15.2 and above.
+
+* Tables with type widening enabled allow you to change column data types to a wider type without rewriting underlying data files. 
+* ![image](https://github.com/user-attachments/assets/5e750a9e-e202-43f5-bce7-23a7fa55f86b)
+* You can enable type widening on an existing table by setting the delta.enableTypeWidening table property to true:
+
+  ALTER TABLE <table_name> SET TBLPROPERTIES ('delta.enableTypeWidening' = 'true')
+
+  CREATE TABLE T(c1 INT) TBLPROPERTIES('delta.enableTypeWidening' = 'true')
+
+  ALTER TABLE <table_name> ALTER COLUMN <col_name> TYPE <new_type>
+
+
+* 
+
+   
+        
+   
+
+
