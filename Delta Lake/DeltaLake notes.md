@@ -346,4 +346,15 @@ PARTITIONED BY (eventType, eventDate)*
 * Azure Databricks leverages Delta Lake functionality to support two distinct options for selective overwrites:
      * The *replaceWhere* option atomically replaces all records that match a given predicate.
      * You can replace directories of data based on how tables are partitioned using dynamic partition overwrites.
-     * For most operations, Databricks recommends using replaceWhere to specify which data to overwrite. 
+     * For most operations, Databricks recommends using replaceWhere to specify which data to overwrite.
+* Arbitrary selective overwrite with replaceWhere: You can selectively overwrite only the data that matches an arbitrary expression. The following command atomically replaces events in January in the target table, which is partitioned by start_date, with the data in replace_data:
+
+  INSERT INTO TABLE events REPLACE WHERE start_date >= '2017-01-01' AND end_date <= '2017-01-31' SELECT * FROM replace_data
+*Check more on it*
+
+# Schema Update:
+* Delta Lake lets you update the schema of a table. The following types of changes are supported:
+     * Adding new columns (at arbitrary positions)
+     * Reordering existing columns
+     * Renaming existing columns
+     * You can make these changes explicitly using DDL or implicitly using DML. An update to a Delta table schema is an operation that conflicts with all concurrent Delta write operations.
