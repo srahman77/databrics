@@ -267,13 +267,16 @@ zcubes can be partial of stable depending on min_cube_size (100 gb) config. zcub
        ![image](https://github.com/user-attachments/assets/ce3d2a1a-dbed-40b5-acfd-f4d49f231f75)
      * Refer https://learn.microsoft.com/en-us/azure/databricks/delta/table-properties for available delta properties
 
-* AutoCompat, OptimizeWrite, Optimise:
+* AutoCompat, OptimizeWrite, Optimise (Auto-optimize (retired term now) meant autocompact and optimizewrite):
      * Optimized Write combines many small writes to the same partition into one larger write operation. It is an optimization performed before the data is written to your Delta table(so describe hist will not show it). Auto Compaction combines many small files into larger, more efficient files. You may need to perform a VACUUM operation afterwards to clean up the remaining small files.
      * Optimized writes are most effective for partitioned tables, as they reduce the number of small files written to each partition by adding another layer of shuffles. Auto optimize will try to create files of 128 MB within each partition. On the other hand, explicit optimize will compress more and create files of 1 GB each (default value, params: spark.databricks.delta.optimize.maxFileSize). The 1 GB default file size was selected from years of customer usage showing that this file size works well on common computational instances.
-     * Auto Compaction is only triggered for partitions or tables that have at least a certain number of small files. *spark.databricks.delta.autoCompact.minNumFiles*. Default 50. Default o/p file size 128 mb
-     * Auto compaction occurs after a write to a table has succeeded and runs synchronously on the cluster that has performed the write. So the write time could increase.
+     * You might have code that runs coalesce(n) or repartition(n) just before you write out your data to control the number of files written. Optimized writes eliminates the need to use this pattern.
+     * Auto Compaction is only triggered for partitions or tables that have at least a certain number of small files. *spark.databricks.delta.autoCompact.minNumFiles*. Default 50. Default o/p file size 128 mb.
+     * You can control the output file size by setting the Spark configuration spark.databricks.delta.autoCompact.maxFileSize
+     * Auto compaction occurs after a write to a table has succeeded and runs synchronously on the cluster that has performed the write. So the write time could increase. Auto compaction only compacts files that haven’t been compacted previously.
      * Why need auto compaction if optimize write was used?  When you are writing frequent small updates to a table. In this case, the files will still be small, even after an Optimized Write.
      * ![image](https://github.com/user-attachments/assets/10a58946-7d51-40cc-8059-81ab1e68653d)
+     * In Databricks Runtime 10.4 LTS and above, auto compaction and optimized writes are always enabled for MERGE, UPDATE, and DELETE operations. You cannot disable this functionality.
 
 # Generated columns:
 * This feature is in Public Preview as of 12 sep,2024.
@@ -321,9 +324,26 @@ PARTITIONED BY (eventType, eventDate)*
 * Azure Databricks enforces the following rules when inserting data into a table:
      * All inserted columns must exist in the target table.
      * All column data types must match the column data types in the target table.
-**FOr Merge**
+**For Merge**
 * If the data type in the source statement does not match the target column, MERGE tries to safely cast column data types to match the target table.
 * The columns that are the target of an UPDATE or INSERT action must exist in the target table.
 * When using INSERT * or UPDATE SET * syntax:
      * Columns in the source dataset not present in the target table are ignored
-     * The source dataset must have all the columns present in the target table. 
+     * The source dataset must have all the columns present in the target table.
+ 
+# File size tuning:
+* Autotune file size based on workload: Databricks recommends setting the table property delta.tuneFileSizesForRewrites to true for all tables that are targeted by many MERGE or DML operations, regardless of Databricks Runtime, Unity Catalog, or other optimizations. When set to true, the target file size for the table is set to a much lower threshold, which accelerates write-intensive operations. If not explicitly set, Azure Databricks automatically detects if 9 out of last 10 previous operations on a Delta table were MERGE operations and sets this table property to true. You must explicitly set this property to false to avoid this behavior.
+* Autotune file size based on table size:
+     * Autotune file size based on table size:To minimize the need for manual tuning, Azure Databricks automatically tunes the file size of Delta tables based on the size of the table. Azure Databricks will use smaller file sizes for smaller tables and larger file sizes for larger tables so that the number of files in the table does not grow too large. Azure Databricks does not autotune tables that you have tuned with a specific target size or based on a workload with frequent rewrites.
+     * The target file size is based on the current size of the Delta table. For tables smaller than 2.56 TB, the autotuned target file size is 256 MB. For tables with a size between 2.56 TB and 10 TB, the target size will grow linearly from 256 MB to 1 GB. For tables larger than 10 TB, the target file size is 1 GB.
+     * When the target file size for a table grows, existing files are not re-optimized into larger files by the OPTIMIZE command. A large table can therefore always have some files that are smaller than the target size. If it is required to optimize those smaller files into larger files as well, you can configure a fixed target file size for the table using the delta.targetFileSize table property.
+* Limit rows written in a data file:
+     * Occasionally, tables with narrow data might encounter an error where the number of rows in a given data file exceeds the support limits of the Parquet format. To avoid this error, you can use the SQL session configuration spark.sql.files.maxRecordsPerFile (maxRecordsPerFile for dataframe api) to specify the maximum number of records to write to a single file for a Delta Lake table. Specifying a value of zero or a negative value represents no limit.
+     * When maxRecordsPerFile is specified, the value of the SQL session configuration spark.sql.files.maxRecordsPerFile is ignored.
+     * Databricks **does not recommend** using this option unless it is necessary to avoid the aforementioned error. This setting might still be necessary for some Unity Catalog managed tables with very narrow data.
+
+# Selectively overwrite data with Delta Lake:
+* Azure Databricks leverages Delta Lake functionality to support two distinct options for selective overwrites:
+     * The *replaceWhere* option atomically replaces all records that match a given predicate.
+     * You can replace directories of data based on how tables are partitioned using dynamic partition overwrites.
+     * For most operations, Databricks recommends using replaceWhere to specify which data to overwrite. 
