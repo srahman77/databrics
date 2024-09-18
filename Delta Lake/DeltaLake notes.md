@@ -420,7 +420,27 @@ WHEN NOT MATCHED BY SOURCE THEN
 * Partitioning works well only for low or known cardinality fields (for example, date fields or physical locations), but not for fields with high cardinality such as timestamps. Z-order works for all fields, including high cardinality fields and fields that may grow infinitely
 * You cannot Z-order on fields used for partitioning.
 
-   
+**Pros and cons of Hive-style partitioning**
+*https://delta.io/blog/pros-cons-hive-style-partionining/#:~:text=Hive%2Dstyle%20partitioning%20physically%20separates,dataset%20that's%20partitioned%20by%20country.&text=Let's%20look%20at%20how%20Hive,our%20attention%20to%20the%20downsides.*
+* Parquet files have file level statistics (such as min/max/null counts for each column chunk) in the footer
+* The hive-style partition details are captured in the metatstore in spark
+* On the other hand, column stats are stored in delta log in delta lake
+* Suppose you want to run the following query: select count(*) from the_table where country = 'Angola'. This query will run faster if the data lake is partitioned by the country column. The query engine only needs to list and read the data files in the country='Angola' directory. It can skip the data files in the other directories. Engines need to run file listing operations to determine the files that must be read for different queries. Hive-style partitioning allows the query engine to read less files for certain queries.
+* File listing operations execute differently depending on the underlying storage system. A file listing operation on a Unix-based file system like Mac OS is executed differently than on a cloud based key-value store, like Amazon S3.
+* *Globbing nested directories is much slower on key-value object stores. Slower file listing operations is just one way Hive-style partitioning can make queries slower.*
+* Hive-style partitioning can also make the small file problem worse. Hive-style partitioning requires data to be stored in separate files. Query engines generally run slower if the data lake contains a lot of small files. The query will generally run faster on 100 files that are 1 GB each compared to 10,000 files that are 0.01 GB each.
+
+**Hive-style partitioning for Lakehouse storage systems**: Let’s dive into the architecture of a Lakehouse storage system to understand how they list files different and why physical disk partitioning isn’t even necessary.
+* Lakehouse storage systems (like Delta Lake) store data in Parquet files and metadata about the files (including the partition structure) in the transaction log.
+* Engines find the file paths in the transaction log when querying Lakehouse storage systems - they don’t need to perform file listing operations (sufficient reason to avoid data partitioning!). Avoiding file listing operations is one major advantage of a Lakehouse storage system over a data lake.
+* Engines don’t need physical disk partitioning to enjoy the data skipping benefits of disk partitioning when Lakehouse storage systems are used. The engine can get all the file skipping benefits from consulting the transaction log. It doesn’t need to glob directories to discern which files contain certain partition values.
+* The only reason Delta Lake supports physical partitioning is for compatibility with other engines that support Hive-style partitioning and to make conversions possible.
+
+**Hive-style partitioning for concurrency**
+* There are certain types of operations that can bypass concurrency issues via Hive-style partitioning.
+* concurrent update and delete operations on the same data may conflict and will throw errors.
+* You can bypass these concurrency errors on a Hive-style partitioned table by running the update and delete operations on non-overlapping partitions. e.g: UPDATE table WHERE date > '2010-01-01'  and DELETE table WHERE date < '2010-01-01'
+* Hive-style partitioning allows users to bypass concurrency issues in certain circumstances, but as we’ve previously mentioned, separating data into subdirectories isn’t strictly necessary to get a full division of data. Logical partitioning (separating data into separate files and recording this in the transaction log) is sufficient and physical partitioning (separate data into separate folders) isn’t strictly necessary.
         
    
 
