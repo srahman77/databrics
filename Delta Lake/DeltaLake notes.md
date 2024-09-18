@@ -395,8 +395,30 @@ WHEN NOT MATCHED BY SOURCE THEN
 
   ALTER TABLE <table_name> ALTER COLUMN <col_name> TYPE <new_type>
 
+# Partitioning:
+* Tables with less than 1 TB of data mostly do not require partitions.
+* Databricks recommends all partitions contain at least a gigabyte of data. Tables with fewer, larger partitions tend to outperform tables with many smaller partitions.
+* **Use ingestion time clustering**:
+     * By using Delta Lake and Databricks Runtime 11.3 LTS or above, unpartitioned tables you create benefit automatically from ingestion time clustering
+     * Ingestion time provides similar query benefits to partitioning strategies based on datetime fields without any need to optimize or tune your data.
+     * To maintain ingestion time clustering when you perform a large number of modifications using UPDATE or MERGE statements on a table, Databricks recommends running OPTIMIZE with ZORDER BY using a column that matches the ingestion order. For instance, this could be a column containing an event timestamp or a creation date.
+     * *Not that useful in prod as there will be many updates/merge and then zorder will anyways be required*
+* **Do Delta Lake and Parquet share partitioning strategies?**:
+     * Delta Lake uses Parquet as the primary format for storing data, and some Delta tables with partitions specified demonstrate organization similar to Parquet tables stored with Apache Spark. 
+     * Apache Spark uses Hive-style partitioning when saving data in Parquet format. Hive-style partitioning **is not** part of the Delta Lake protocol, and workloads should not rely on this partitioning strategy to interact with Delta tables.
+     * While Azure Databricks and Delta Lake build upon open source technologies like Apache Spark, Parquet, Hive, and Hadoop, partitioning motivations and strategies useful in these technologies do not generally hold true for Azure Databricks.
+     * If you do choose to partition your table, consider the following facts before choosing a strategy:
+          * Transactions are not defined by partition boundaries. Delta Lake ensures ACID through transaction logs, so you do not need to separate a batch of data by a partition to ensure atomic discovery.
+          * Azure Databricks compute clusters do not have data locality tied to physical media. Data ingested into the lakehouse is stored in cloud object storage. While data is cached to local disk storage during data processing, Azure Databricks uses file-based statistics to identify the minimal amount of data for parallel loading.
 
-* 
+* **If partitions are so bad, why do some Azure Databricks features use them?**
+* Partitions can be beneficial, especially for very large tables. Many performance enhancements around partitioning focus on very large tables (hundreds of terabytes or greater).
+* Many customers migrate to Delta Lake from Parquet-based data lakes. The CONVERT TO DELTA statement allows you to convert an existing Parquet-based table to a Delta table without rewriting existing data. As such, many customers have large tables that inherit previous partitioning strategies. Some optimizations developed by Databricks seek to leverage these partitions when possible, mitigating some potential downsides for partitioning strategies not optimized for Delta Lake.
+* Is it possible to outperform Azure Databricks built-in optimizations with custom partitioning?: Some experienced users of Apache Spark and Delta Lake might be able to design and implement a pattern that provides better performance than ingestion time clustering. Implementing a bad partitioning stategy can have very negative repercussions on downstream performance and might require a full rewrite of data to fix. Databricks recommends that most users use default settings to avoid introducing expensive inefficiencies.
+* **How do Z-order and partitions work together?**
+* You cannot combine files across partition boundaries, and so Z-order clustering can only occur within a partition. For unpartitioned tables, files can be combined across the entire table.
+* Partitioning works well only for low or known cardinality fields (for example, date fields or physical locations), but not for fields with high cardinality such as timestamps. Z-order works for all fields, including high cardinality fields and fields that may grow infinitely
+* You cannot Z-order on fields used for partitioning.
 
    
         
