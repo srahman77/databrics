@@ -300,7 +300,7 @@ PARTITIONED BY (eventType, eventDate)*
    Query: *SELECT * FROM events WHERE eventTime >= "2020-10-01 00:00:00" <= "2020-10-01 12:00:00"*
 
    Delta Lake automatically generates a partition filter so that the preceding query only reads the data in partition          date=2020-10-01 even if a partition filter (eventDate) is not specified (since eventDate is derived from eventTime)
-
+* If we change the generation expression, then schema needs to be overwrite ("overwriteSchema", "True" in pyspark) as generated column is considered part of the schema.
 # Identity columns: 
 * Delta Lake identity columns are a type of generated column that assigns unique values for each record inserted into a table.
 * Declaring an identity column on a Delta table disables concurrent transactions. Only use identity columns in use cases where concurrent writes to the target table are not required.
