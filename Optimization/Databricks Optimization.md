@@ -90,6 +90,16 @@
 ![image](https://github.com/user-attachments/assets/c0d2d5a5-827a-4904-8059-3c91e7ada8d1)
 * Low-Shuffle MERGE optimizes execution by removing any updated and deleted rows (Step 2 shown below) from the original file while writing any new and updated rows (Step 1 shown below) in a separate file
  ![image](https://github.com/user-attachments/assets/86aa7602-a0f5-41fc-baea-dcb7a2ae4f65)
-* No of files will increase though! So we will run optimize to handle small file problem
+* No of files will increase though! So we will run optimize to handle small file problem.
+
+# AQE:
+* Adaptive query execution (AQE) is query re-optimization that occurs during query execution.
+* The motivation for runtime re-optimization is that Azure Databricks has the most up-to-date accurate statistics at the end of a shuffle and broadcast exchange (referred to as a query stage in AQE). As a result, Azure Databricks can opt for a better physical strategy, pick an optimal post-shuffle partition size and number, or do optimizations that used to require hints, for example, skew join handling.
+* AQE is enabled by default. It has 4 major features:
+    * Dynamically changes sort merge join into broadcast hash join.
+    * Dynamically coalesces partitions (combine small partitions into reasonably sized partitions) after shuffle exchange. Very small tasks have worse I/O throughput and tend to suffer more from scheduling overhead and task setup overhead. Combining small tasks saves resources and improves cluster throughput.
+    * Dynamically handles skew in sort merge join and shuffle hash join by splitting (and replicating if needed) skewed tasks into roughly evenly sized tasks.
+    * Dynamically detects and propagates empty relations.
+* 
 
   
