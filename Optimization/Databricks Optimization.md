@@ -52,15 +52,16 @@
 * Dynamic File Pruning (DFP), a new data-skipping technique, which can significantly improve queries with selective joins on non-partition columns on tables in Delta Lake, now enabled by default in Databricks Runtime.
 * Prior to Dynamic File Pruning, file pruning only took place when queries contained a literal value in the predicate (and use that in delta log stats). DFP  works for both literal filters as well as join filters.
 * This means that Dynamic File Pruning now allows star schema queries to take advantage of data skipping at file granularity (join filters on the fact table are unknown at query compilation time).
-* ![image](https://github.com/user-attachments/assets/f14b46f5-2870-46b0-8d84-0635688b0ce0)
+  ![image](https://github.com/user-attachments/assets/f14b46f5-2870-46b0-8d84-0635688b0ce0)
 **Star Schema Join withiout DFP**
 * e.g SELECT sum(ss_quantity) 
     FROM store_sales 
     JOIN item ON ss_item_sk = i_item_sk
     WHERE i_item_id = 'AAAAAAAAICAAAAAA'
 * store_sales is *probe* sode and item is build *side*
+* Keep the dim tables at the right side of a join for better performance/best practice! See the details down below (left relation of a left outer join cannot be broadcasted)
 * It specifies the predicate on the dimension table (item), not the fact table (store_sales). This means that filtering of rows for store_sales would typically be done as part of the JOIN operation since the values of ss_item_sk are not known until after the SCAN and FILTER operations take place on the item table.
-* ![image](https://github.com/user-attachments/assets/cda9a450-b4c3-4a2e-b1da-4f7d875a1514)
+  ![image](https://github.com/user-attachments/assets/cda9a450-b4c3-4a2e-b1da-4f7d875a1514)
 * only 48K rows meet the JOIN criteria yet over 8.6B records had to be read from the store_sales table
 **Star Schema Join with Dynamic File Pruning** 
 ![image](https://github.com/user-attachments/assets/e54593d6-a7a7-4533-a215-c11bb62304ed)
@@ -100,6 +101,67 @@
     * Dynamically coalesces partitions (combine small partitions into reasonably sized partitions) after shuffle exchange. Very small tasks have worse I/O throughput and tend to suffer more from scheduling overhead and task setup overhead. Combining small tasks saves resources and improves cluster throughput.
     * Dynamically handles skew in sort merge join and shuffle hash join by splitting (and replicating if needed) skewed tasks into roughly evenly sized tasks.
     * Dynamically detects and propagates empty relations.
+* AdaptiveSparkPlan node:
+  * AQE-applied queries contain one or more AdaptiveSparkPlan nodes, usually as the root node of each main query or sub-query. Before the query runs or when it is running, the isFinalPlan flag of the corresponding AdaptiveSparkPlan node shows as false; after the query execution completes, the isFinalPlan flag changes to true.
+  * The query plan diagram evolves as the execution progresses and reflects the most current plan that is being executed. Nodes that have already been executed (in which metrics are available) will not change, but those that haven’t can change over time as the result of re-optimizations.
+    ![image](https://github.com/user-attachments/assets/705b74c9-657e-48ba-8ef3-91abd4052b18)
+* Runtime statistics:
+  * Each shuffle and broadcast stage contains data statistics.
+  * Before the stage runs or *when the stage is running*, the statistics are compile-time estimates, and the flag *isRuntime* is false, for example: Statistics(sizeInBytes=1024.0 KiB, rowCount=4, isRuntime=false);
+  * After the stage execution completes, the statistics are those collected at runtime, and the flag isRuntime will become true, for example: Statistics(sizeInBytes=658.1 KiB, rowCount=2.81E+4, isRuntime=true)
+  * The following is a DataFrame.explain example:
+    ![image](https://github.com/user-attachments/assets/d887f63e-5a5d-4359-9f7e-a75403cb059d)
+    ![image](https://github.com/user-attachments/assets/3ff95f47-94a5-43b6-ab82-9cc79ab58d2b)
+  * As **SQL EXPLAIN** does not execute the query, the current plan is always the same as the initial plan and does not reflect what would eventually get executed by AQE.
+    ![image](https://github.com/user-attachments/assets/c4a74e47-5020-4c47-bed5-f22f97ce4743)
+* AQE Configuration:
+**Dynamically coalesce partitions**
+  * spark.databricks.optimizer.adaptive.enabled (Default value: true): Whether to enable or disable adaptive query execution.
+  * spark.sql.shuffle.partitions (Default value: 200): The default number of partitions to use when shuffling data for joins or aggregations. Setting the value auto enables auto-optimized shuffle, which automatically determines this number based on the query plan and the query input data size.
+  * spark.databricks.adaptive.autoBroadcastJoinThreshold (Default value: 30MB): The threshold to trigger sort merge join into broadcast hash join
+  * spark.sql.adaptive.coalescePartitions.enabled (Default value: true):Whether to enable or disable partition coalescing.
+  * spark.sql.adaptive.advisoryPartitionSizeInBytes (Default value: 64MB): The target size after coalescing. The coalesced partition sizes will be close to but no bigger than this target size.
+  * spark.sql.adaptive.coalescePartitions.minPartitionSize (Default value: 1MB): The minimum size of partitions after coalescing. The coalesced partition sizes will be no smaller than this size.
+  * spark.sql.adaptive.coalescePartitions.minPartitionNum (Default value: 2x no. of cluster cores): The minimum number of partitions after coalescing. *Not recommended, because setting explicitly overrides spark.sql.adaptive.coalescePartitions.minPartitionSize*.
+**Dynamically handle skew join**
+  * spark.sql.adaptive.skewJoin.enabled(Default value: true): Whether to enable or disable skew join handling.
+  * spark.sql.adaptive.skewJoin.skewedPartitionFactor (Default value: 5): A factor that when multiplied by the median partition size contributes to determining whether a partition is skewed.
+  * spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes (Default value: 256MB): A threshold that contributes to determining whether a partition is skewed.
+  * A partition is considered skewed when both (partition size > skewedPartitionFactor * median partition size) and (partition size > skewedPartitionThresholdInBytes) are true.
+**Dynamically detect and propagate empty relations**
+  * spark.databricks.adaptive.emptyRelationPropagation.enabled (Default value: true): Whether to enable or disable dynamic empty relation propagation.
+
+**FAQs on AQE**
+* Why didn’t AQE broadcast a small join table?
+  
+  If the size of the relation expected to be broadcast does fall under this threshold but is still not broadcast:
+  * Check the join type. Broadcast is not supported for certain join types, for example, the *left relation of a LEFT OUTER JOIN or right relation of a RIGHT OUTER JOIN cannot be broadcast*. Some more stack overflow poinyts on this:
+      * Big-Table left outer join Small-Table -- Broadcast Enabled; Small-Table left outer join Big-Table -- Broadcast Disabled: The reason for this is that Spark shares the small table (also known as the broadcast table) to all data nodes where the big table data is present. In your case, you need all the data from the small table but only the matching data from the big table. Spark cannot determine whether a particular record was matched at another data node or if there was no match at all, so there is ambiguity when selecting all the records from the small table if it were distributed. As a result, Spark won't use broadcast join in this scenario.
+      * Why ambiguous result?: In a left outer join, at least one record from the left table should be included in the output. If there's no match at worker 1 for a record, sending it back to the driver, and subsequently finding a match on worker 2, can lead to ambiguous results. The output may include the record from worker 1 (without a match with the right table) and the matched record from worker 2. As you mentioned, if we only send record back to driver incase of a match, then it will be Equi-join not left outer join.
+  * It can also be that the relation contains a lot of empty partitions, in which case the majority of the tasks can finish quickly with sort merge join or it can potentially be optimized with skew join handling. AQE avoids changing such sort merge joins to broadcast hash joins if the percentage of non-empty partitions is lower than spark.sql.adaptive.nonEmptyPartitionRatioForBroadcastJoin.
+
+* Should I still use a broadcast join strategy hint with AQE enabled?
+  * Yes. A statically planned broadcast join is usually more performant than a dynamically planned one by AQE as AQE might not switch to broadcast join until after performing shuffle for both sides of the join (by which time the actual relation sizes are obtained). So using a broadcast hint can still be a good choice if you know your query well. AQE will respect query hints the same way as static optimization does, but can still apply dynamic optimizations that are not affected by the hints.
+
+* What is the difference between skew join hint and AQE skew join optimization? Which one should I use?
+  * It is recommended to rely on AQE skew join handling rather than use the skew join hint, because AQE skew join is completely automatic and in general performs better than the hint counterpart.
+ 
+* Why didn’t AQE adjust my join ordering automatically?
+  * Dynamic join reordering is not part of AQE.
+
+* Why didn’t AQE detect my data skew?
+
+  There are two size conditions that must be satisfied for AQE to detect a partition as a skewed partition:
+  * The partition size is larger than the spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes (default 256MB)
+  * The partition size is larger than the median size of all partitions times the skewed partition factor spark.sql.adaptive.skewJoin.skewedPartitionFactor (default 5)
+  * In addition, skew handling support is limited for certain join types, for example, in LEFT OUTER JOIN, only skew on the left side can be optimized.
+
 * 
+ 
+
+
+    
+
+  
 
   
