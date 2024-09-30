@@ -220,7 +220,12 @@
    * See more whenever needed
 
 # Isolation levels and write conflicts on Azure Databricks
-* 
+* The isolation level of a table defines the degree to which a transaction must be isolated from modifications made by concurrent operations.
+* Write conflicts on Azure Databricks depend on the isolation level.
+* Delta Lake provides ACID transaction guarantees between reads and writes. This means that:
+    * Multiple writers across multiple clusters can simultaneously modify a table partition. Writers see a consistent snapshot view of the table and writes occur in a serial order.
+    * Readers continue to see a consistent snapshot view of the table that the Azure Databricks job started with, even when a table is modified during a job.
+* Metadata changes cause all concurrent write operations to fail. These operations include changes to table protocol, table properties, or data schema.
    
   
   
