@@ -156,11 +156,75 @@
   * The partition size is larger than the median size of all partitions times the skewed partition factor spark.sql.adaptive.skewJoin.skewedPartitionFactor (default 5)
   * In addition, skew handling support is limited for certain join types, for example, in LEFT OUTER JOIN, only skew on the left side can be optimized.
 
-* 
+
+# Predictive I/O 
+* Predictive I/O is exclusive to the Photon engine on Azure Databricks.
+* Predictive I/O is a collection of Azure Databricks optimizations that improve performance for data interactions. Predictive I/O capabilities are grouped into the following categories:
+  * Accelerated reads reduce the time it takes to scan and read data.
+  * Accelerated updates reduce the amount of data that needs to be rewritten during updates, deletes, and merges.
+* Predictive I/O reads are supported by the serverless and pro types of SQL warehouses, and Photon-accelerated clusters running Databricks Runtime 11.3 LTS and above.
+* Predictive I/O improves scanning performance by applying deep learning techniques to do the following:
+  * Determine the most efficient access pattern to read the data and only scanning the data that is actually needed.
+  * Eliminate the decoding of columns and rows that are not required to generate query results.
+  * Calculate the probabilities of the search criteria in selective queries matching a row. As queries run, we use these probabilities to anticipate where the next matching row would occur and only read that data from cloud storage.
+* Predictive I/O leverages deletion vectors to accelerate updates by reducing the frequency of full file rewrites during data modification on Delta tables. Predictive I/O optimizes DELETE, MERGE, and UPDATE operations.
+* Use predictive I/O to accelerate updates: Predictive I/O for updates are used automatically for all tables that have deletion vectors enabled using the following Photon-enabled compute types:
+  * Serverless SQL warehouses.
+  * Pro SQL warehouses.
+  * Clusters running Databricks Runtime 14.0 and above.
+
+# Cost-based optimizer
+* Spark SQL can use a cost-based optimizer (CBO) to improve query plans. This is especially useful for queries with multiple joins. For this to work it is critical to collect table and column statistics and keep them up to date.
+* To keep the statistics up-to-date, run *ANALYZE TABLE* after writing to the table.
+* The rowCount statistic is especially important for queries with multiple joins. If rowCount is missing, it means there is not enough information to calculate it (that is, some required columns do not have statistics).
+* For example, CBO might switch from a hash join to a sort-merge join based on data size and distribution, optimizing performance
+* Few points in UI for example:
+![image](https://github.com/user-attachments/assets/e65ff27d-fa0f-47e4-80da-e4d530cc3c4d)
+  * A line such as *rows output: 2,451,005 est: N/A* means that this operator produces approximately 2M rows and there were no statistics available.
+  * A line such as *rows output: 2,451,005 est: 1616404 (1X)* means that this operator produces approx. 2M rows, while the estimate was approx. 1.6M and the estimation error factor was 1.
+  * A line such as *rows output: 2,451,005 est: 2626656323 (1000X)* means that this operator produces approximately 2M rows while the estimate was 2B rows, so the estimation error factor was 1000.
+* The CBO is enabled by default. You disable the CBO by: spark.conf.set("spark.sql.cbo.enabled", false)
  
 
+# Range join optimization
+* A range join occurs when two relations are joined using a point in interval or interval overlap condition. The range join optimization support in Databricks Runtime can bring orders of magnitude improvement in query performance, but requires careful manual tuning.
+* Point in interval range join: A point in interval range join is a join in which the condition contains predicates specifying that a value from one relation is between two values from the other relation. For example:
 
-    
+  SELECT * FROM points JOIN ranges ON points.p BETWEEN ranges.start and ranges.end;
+
+  SELECT * FROM points JOIN ranges ON points.p >= ranges.start AND points.p < ranges.end;
+
+  SELECT * FROM points JOIN ranges ON points.p >= ranges.start AND points.p < ranges.start + 100;
+
+  SELECT * FROM points1 p1 JOIN points2 p2 ON p1.p >= p2.p - 10 AND p1.p <= p2.p + 10;
+
+* Interval overlap range join: An interval overlap range join is a join in which the condition contains predicates specifying an overlap of intervals between two values from each relation. For example:
+  
+   SELECT * FROM r1 JOIN r2 ON r1.start < r2.end AND r2.start < r1.end;
+
+   SELECT * FROM r1 JOIN r2 ON r1.start < r2.start + 100 AND r2.start < r1.start + 100;
+
+* Range join optimization: The range join optimization is performed for joins that:
+  * Have a condition that can be interpreted as a point in interval or interval overlap range join.
+  * All values involved in the range join condition are of a numeric type (integral, floating point, decimal), DATE, or TIMESTAMP.
+  * All values involved in the range join condition are of the same type. In the case of the decimal type, the values also need to be of the same scale and precision.
+  * It is an INNER JOIN, or in case of point in interval range join, a LEFT OUTER JOIN with point value on the left side, or RIGHT OUTER JOIN with point value on the right side.
+  * Have a bin size tuning parameter
+
+ * Bin size:
+   * The bin size is a numeric tuning parameter that splits the values domain of the range condition into multiple bins of equal size. For example, with a bin size of 10, the optimization splits the domain into bins that are intervals of length 10. If you have a point in range condition of p BETWEEN start AND end, and start is 8 and end is 22, this value interval overlaps with three bins of length 10 – the first bin from 0 to 10, the second bin from 10 to 20, and the third bin from 20 to 30. Only the points that fall within the same three bins need to be considered as possible join matches for that interval. For example, if p is 32, it can be ruled out as falling between start of 8 and end of 22, because it falls in the bin from 30 to 40.
+   * For DATE values, the value of the bin size is interpreted as days. For example, a bin size value of 7 represents a week.
+   * For TIMESTAMP values, the value of the bin size is interpreted as seconds. If a sub-second value is required, fractional values can be used. For example, a bin size value of 60 represents a minute, and a bin size value of 0.1 represents 100 milliseconds.
+   * You can specify the bin size either by using a range join hint in the query or by setting a session configuration parameter. The range join optimization is applied only if you manually specify the bin size.
+   * hint e.g : SELECT /*+ RANGE_JOIN(points, 10) */ * FROM points JOIN ranges ON points.p >= ranges.start AND points.p < ranges.end;
+   * See more whenever needed
+
+# Isolation levels and write conflicts on Azure Databricks
+* 
+   
+  
+  
+ 
 
   
 
