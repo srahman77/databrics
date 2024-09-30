@@ -219,7 +219,11 @@
    * hint e.g : SELECT /*+ RANGE_JOIN(points, 10) */ * FROM points JOIN ranges ON points.p >= ranges.start AND points.p < ranges.end;
    * See more whenever needed
 
-# Isolation levels and write conflicts on Azure Databricks
+# ACID guarantees on Azure Databricks, Isolation levels and write conflicts on Azure Databricks:
+* 
+
+
+
 * The isolation level of a table defines the degree to which a transaction must be isolated from modifications made by concurrent operations.
 * Write conflicts on Azure Databricks depend on the isolation level.
 * Delta Lake provides ACID transaction guarantees between reads and writes. This means that:
