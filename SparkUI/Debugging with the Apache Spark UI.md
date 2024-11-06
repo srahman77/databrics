@@ -23,3 +23,28 @@
 
 
 # Diagnosing issues with Spark UI
+
+* **Job event Timeline** : https://learn.microsoft.com/en-us/azure/databricks/optimizations/spark-ui-guide/jobs-timeline
+   * Failing jobs or failing executors/executores removed:
+     ![image](https://github.com/user-attachments/assets/295eda2b-78d3-4971-b6d9-28b022cbd166)
+   * The most common reasons for executors being removed are:
+      * Autoscaling: In this case it’s expected and not an error
+      * Spot instance losses: The cloud provider is reclaiming your VMs.
+      * Executors running out of memory
+   * Failing jobs:
+      * If you see any failing jobs, click on the link in description to get to their pages. Then scroll down to see the failed stage and a failure reason:
+        ![image](https://github.com/user-attachments/assets/6e4aae90-cf73-4cba-a89a-09084a7b3312)
+      * You may get a generic error. Click on the link in the description again (this time in the page where failure reason is available) to see if you can get more info:
+        ![image](https://github.com/user-attachments/assets/a6d6e29c-633b-4a25-9e4b-20e0e86ac3e3)
+    * Failing executors:
+       * To find out why your executors are failing, you’ll first want to check the compute’s Event log to see if there’s any explanation for why the executors failed. For example, it’s possible you’re using spot instances and the cloud provider is taking them back.
+         ![image](https://github.com/user-attachments/assets/e15a2f10-258c-4308-bfb4-5b3b82ebec11)
+       * If you don’t see any information in the event log, navigate back to the Spark UI then click the Executors tab. Here you can get the logs from the failed executors:
+         ![image](https://github.com/user-attachments/assets/0237dc47-7a1e-472d-ae9d-e29efd6968c3)
+  
+
+* **Gaps in execution**
+   *   
+     
+
+
