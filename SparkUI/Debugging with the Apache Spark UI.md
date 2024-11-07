@@ -124,7 +124,29 @@ Although “data size total” metrics in the Exchange node don’t provide the 
 
            After lowering the preshufflePartitionSizeInBytes value to 16MB, if AOS is still calculating the incorrect number of partitions and you are still experiencing large data spills, you should further lower the preshufflePartitionSizeInBytes value to 8MB. If this still doesn’t resolve your spill issue, it is best to disable AOS and manually tune the number of shuffle partitions as explained in the next section.
 
-      * (2)Manually fine-tune:
+      * (2)Manually fine-tune: To manually fine-tune the number of shuffle partitions we need:
+        * The total amount of shuffled data. To do so, run the Spark query once, and then use the Spark UI to retrieve this value, as demonstrated in the example below:
+          ![image](https://github.com/user-attachments/assets/25300a51-b169-4dfb-918f-5c42d9235381)
+        * As a rule of thumb, we need to make sure that after tuning the number of shuffle partitions, each task should approximately be processing 128MB to 200MB of data. You can see this value in the summary metrics for the shuffle stage in Spark UI, as shown in the example below:
+          ![image](https://github.com/user-attachments/assets/f5267ea2-866f-49cc-974d-2334ab586fed)
+        * So here is the formula to compute the right number of shuffle partitions:
+        * Let’s assume that:
+             * Total number of total worker cores in cluster = T
+             * Total amount of data being shuffled in shuffle stage (in megabytes) = B
+             * Optimal size of data to be processed per task (in megabytes) = 128
+             * Hence the multiplication factor (M): M = ceiling(B / 128 / T)
+             * And the number of shuffle partitions (N): N = M x T
+             * Note that we have used the ceiling function here to ensure that all the cluster cores are fully engaged till the very last execution cycle.
+        * The optimal size of data to be processed per task should be 128MB approximately. It works well in most cases. It might not work if there is some sort of data explosion happening in your query. You might need to choose a smaller value in that case. We will have a section on data explosion later in this document.
+        * If you are neither using auto-tune (AOS) nor manually fine-tuning the shuffle partitions, then as a rule of thumb set this to twice, or better thrice, the number of total worker CPU cores
+           * set spark.sql.shuffle.partitions = 2*<number of total worker cores in cluster> (sql)
+           * spark.conf.set(“spark.sql.shuffle.partitions”, 2*<number of total worker cores in cluster>) *or* spark.conf.set(“spark.sql.shuffle.partitions”, 2*sc.defaultParallelism)
+           * Because there may be multiple Spark SQL queries in a single notebook, fine-tuning the number of shuffle partitions for each query is a time-consuming task. So, our advice is to fine-tune it for the largest query with the greatest number for the total amount of data being shuffled for a shuffle stage and then set that value once for the entire notebook.
+           * If there is skewness in data, then fine-tuning the shuffle partitions will not help with data spills. In that case, you should first get rid of the data skew. Please refer to the next section on data skew for more details.
+
+
+
+ 
            
 
 
