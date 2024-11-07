@@ -107,13 +107,25 @@
      ![image](https://github.com/user-attachments/assets/a5dcd3e1-5ec4-4feb-bd64-d1cc474a30e0)
    * Spill is what happens when Spark runs low on memory. It starts to move data from memory to disk, and this can be quite expensive. It is most common during data shuffling.
    * The default setting for the number of Spark SQL shuffle partitions (i.e., the number of CPU cores used to perform wide transformations such as joins, aggregations and so on) is 200, which isn’t always the best value. As a result, each Spark task (or CPU core) is given a large amount of data to process, and if the memory available to each core is insufficient to fit all of that data, some of it is spilled to disk. Spilling to disk is a costly operation, as it involves data serialization, de-serialization, reading and writing to disk, etc. Spilling needs to be avoided at all costs and in doing so, we must tune the number of shuffle partitions. There are a couple of ways to tune the number of Spark SQL shuffle partitions as discussed below.
-      * AQE auto-tuning (set spark.sql.shuffle.partitions=auto): Spark AQE has a feature called autoOptimizeShuffle (AOS), which can automatically find the right number of shuffle partitions.
-         * Caveat: unusually high compression.There are certain limitations to AOS. AOS may not be able to estimate the correct number of shuffle partitions in some circumstances where source tables have an unusually high compression ratio (20x to 40x).There are two ways you can identify the highly compressed tables:
+      * (1)AQE auto-tuning (set spark.sql.shuffle.partitions=auto): Spark AQE has a feature called autoOptimizeShuffle (AOS), which can automatically find the right number of shuffle partitions.
+         * **Caveat**: unusually high compression.There are certain limitations to AOS. AOS may not be able to estimate the correct number of shuffle partitions in some circumstances where source tables have an unusually high compression ratio (20x to 40x).There are two ways you can identify the highly compressed tables:
              *  Spark UI SQL DAG:
                ![image](https://github.com/user-attachments/assets/c0291b37-7c1a-497c-840b-d143960c4369)
 Although “data size total” metrics in the Exchange node don’t provide the exact size of a table in memory, it can definitely help identify the highly compressed tables. Scan Parquet node provides the precise size of a table in the disk. The Exchange node data size in the aforementioned case is 40x larger than the size on the disk, indicating that the table is probably heavily compressed on the disk.
 
-             * Cache the table: A table can be cached in memory to figure out its actual size in memory. Here’s how to go about it: 
+             * Cache the table: A table can be cached in memory to figure out its actual size in memory. Here’s how to go about it:
+               ![image](https://github.com/user-attachments/assets/08182559-eec1-4175-b0b4-2ecd91c4e3a7)
+
+               Refer to the storage tab of Spark UI to find the size of the table in memory after the command above has been completed:
+               ![image](https://github.com/user-attachments/assets/588fa4ff-2f9d-4eb7-bbe5-bc0880d58914)
+         
+
+         * **Solution:** To counter this effect, reduce the value of the per partition size used by AQE to determine the initial shuffle partition number (default 128MB) as follows:     *set spark.databricks.adaptive.autoOptimizeShuffle.preshufflePartitionSizeInBytes = 16777216* (setting to 16MB for example).
+
+           After lowering the preshufflePartitionSizeInBytes value to 16MB, if AOS is still calculating the incorrect number of partitions and you are still experiencing large data spills, you should further lower the preshufflePartitionSizeInBytes value to 8MB. If this still doesn’t resolve your spill issue, it is best to disable AOS and manually tune the number of shuffle partitions as explained in the next section.
+
+      * (2)Manually fine-tune:
+           
 
 
 
