@@ -43,8 +43,15 @@
          ![image](https://github.com/user-attachments/assets/0237dc47-7a1e-472d-ae9d-e29efd6968c3)
   
 
-* **Gaps in execution**
-   *   
+* **Gaps between Spark jobs**
+  ![image](https://github.com/user-attachments/assets/343ead6a-b85f-48cd-970f-b1e45e757c9a)
+   * There are a few reasons for the gaps between execution e.g in the above pic. If the gaps make up a high proportion of the time spent on your workload, you need to figure out what is causing these gaps and if it’s expected or not. There are a few things that could be happening during the gaps:
+      * There’s no work to do: On all-purpose compute, having no work to do is the most likely explanation for the gaps. Because the cluster is running and users are submitting queries, gaps are expected. These gaps are the time between query submissions.
+      * Driver is compiling a complex execution plan: 
+      * Execution of non-spark code
+      * Driver is overloaded
+      * Cluster is malfunctioning
+
      
 
 
