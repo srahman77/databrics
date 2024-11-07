@@ -59,6 +59,25 @@
         ![image](https://github.com/user-attachments/assets/a02fee7e-de6b-428b-b2b0-79d9be878b60)
 
 
-     
+* **Long Jobs: Diagnosing a long stage in Spark**
+  * Start by identifying the longest stage of the job. Scroll to the bottom of the job’s page to the list of stages and order them by duration.
+    ![image](https://github.com/user-attachments/assets/ff77489a-a626-4798-aa63-29223126137b)
+  * To see high-level data about what this stage was doing, look at the Input, Output, Shuffle Read, and Shuffle Write columns (Make note of these numbers as you’ll likely need them later.):
+    * Input: How much data this stage read from storage. This could be reading from Delta, Parquet, CSV, etc.
+    * Output: How much data this stage wrote to storage. This could be writing to Delta, Parquet, CSV, etc.
+    * Shuffle Read: How much shuffle data this stage read.
+    * Shuffle Write: How much shuffle data this stage wrote.
+  * The number of tasks in the long stage can point you in the direction of your issue. *If you see one task, that could be a sign of a problem. While this one task is running only one CPU is utilized and the rest of the cluster may be idle*. This happens most frequently in the following situations:
+     * Expensive UDF on small data
+     * Window function without PARTITION BY statement
+     * Reading from an unsplittable file type. This means the file cannot be read in multiple parts, so you end up with one big task. Gzip is an example of an unsplittable file type.
+     * Setting the multiLine option when reading a JSON or CSV file
+     * Schema inference of a large file
+     * Use of repartition(1) or coalesce(1)
+  * If the stage has more than one task, you should investigate further. Click on the link in the stage’s description to get more info about the longest stage:
+    ![image](https://github.com/user-attachments/assets/d0863790-15dc-4a6a-84c1-a5eb9e7bd5da)
+
+* **Spark driver overloaded**
+  *  
 
 
