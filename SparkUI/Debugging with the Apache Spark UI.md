@@ -47,10 +47,17 @@
   ![image](https://github.com/user-attachments/assets/343ead6a-b85f-48cd-970f-b1e45e757c9a)
    * There are a few reasons for the gaps between execution e.g in the above pic. If the gaps make up a high proportion of the time spent on your workload, you need to figure out what is causing these gaps and if it’s expected or not. There are a few things that could be happening during the gaps:
       * There’s no work to do: On all-purpose compute, having no work to do is the most likely explanation for the gaps. Because the cluster is running and users are submitting queries, gaps are expected. These gaps are the time between query submissions.
-      * Driver is compiling a complex execution plan: 
-      * Execution of non-spark code
-      * Driver is overloaded
-      * Cluster is malfunctioning
+      * Driver is compiling a complex execution plan: For example, if you use withColumn() in a loop, it creates a very expensive plan to process. The gaps could be the time the driver is spending simply building and processing the plan (even though execution time will be same, creating the plan becomes lengthier). If this is the case, try simplifying the code. Use selectExpr() to combine multiple withColumn() calls into one expression, or convert the code into SQL. You can still embed the SQL in your Python code, using Python to manipulate the query with string functions. This often fixes this type of problem. 
+      * Execution of non-spark code: Spark code is either written in SQL or using a Spark API like PySpark. Any execution of code that is not Spark will show up in the timeline as gaps. For example, you could have a loop in Python which calls native Python functions. This code is not executing in Spark. If you see gaps in your timeline caused by running non-Spark code, this means your workers are all idle and likely wasting money during the gaps. Maybe this is intentional and unavoidable, but if you can write this code to use Spark you will fully utilize the cluster
+      * Driver is overloaded: To determine if your driver is overloaded, you need to look at the cluster metrics (on DBR 13.0 or later, click Metrics). Notice the Server load distribution visualization. You should look to see if the driver is heavily loaded.
+          * Complete idle cluster:
+            ![image](https://github.com/user-attachments/assets/ef5fea43-c14a-474f-902d-5b27c974118b)
+          * Driver overloaded cluster: We can see that one square is red, while the others are blue. Roll your mouse over the red square to make sure the red block represents your driver.
+            ![image](https://github.com/user-attachments/assets/923586ad-4b5b-42d4-a962-01de3d839949)
+ 
+      * Cluster is malfunctioning: Malfunctioning clusters are rare, but if this is the case it can be difficult to determine what happened. You may just want to restart the cluster to see if this resolves the issue. You can also look into the logs to see if there’s anything suspicious. The Event log tab and Driver logs tabs, highlighted in the screenshot below, will be the places to look. You may want to enable Cluster log delivery in order to access the logs of the workers. You can also change the log level, but you might need to reach out to your Databricks account team for help.
+        ![image](https://github.com/user-attachments/assets/a02fee7e-de6b-428b-b2b0-79d9be878b60)
+
 
      
 
