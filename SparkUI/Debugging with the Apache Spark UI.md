@@ -49,7 +49,7 @@
       * There’s no work to do: On all-purpose compute, having no work to do is the most likely explanation for the gaps. Because the cluster is running and users are submitting queries, gaps are expected. These gaps are the time between query submissions.
       * Driver is compiling a complex execution plan: For example, if you use withColumn() in a loop, it creates a very expensive plan to process. The gaps could be the time the driver is spending simply building and processing the plan (even though execution time will be same, creating the plan becomes lengthier). If this is the case, try simplifying the code. Use selectExpr() to combine multiple withColumn() calls into one expression, or convert the code into SQL. You can still embed the SQL in your Python code, using Python to manipulate the query with string functions. This often fixes this type of problem. 
       * Execution of non-spark code: Spark code is either written in SQL or using a Spark API like PySpark. Any execution of code that is not Spark will show up in the timeline as gaps. For example, you could have a loop in Python which calls native Python functions. This code is not executing in Spark. If you see gaps in your timeline caused by running non-Spark code, this means your workers are all idle and likely wasting money during the gaps. Maybe this is intentional and unavoidable, but if you can write this code to use Spark you will fully utilize the cluster
-      * Driver is overloaded: To determine if your driver is overloaded, you need to look at the cluster metrics (on DBR 13.0 or later, click Metrics). Notice the Server load distribution visualization. You should look to see if the driver is heavily loaded.
+      * Driver is overloaded: To determine if your driver is overloaded, you need to look at the cluster metrics (on DBR 13.0 or later, click Metrics). Notice the Server load distribution visualization. You should look to see if the driver is heavily loaded. Check more on driver overload in the following section.
           * Complete idle cluster:
             ![image](https://github.com/user-attachments/assets/ef5fea43-c14a-474f-902d-5b27c974118b)
           * Driver overloaded cluster: We can see that one square is red, while the others are blue. Roll your mouse over the red square to make sure the red block represents your driver.
@@ -78,6 +78,43 @@
     ![image](https://github.com/user-attachments/assets/d0863790-15dc-4a6a-84c1-a5eb9e7bd5da)
 
 * **Spark driver overloaded**
-  *  
+  * The most common reason for driver overload is that there are too many concurrent things running on the cluster. This could be too many streams, queries, or Spark jobs (some customers use threads to run many spark jobs concurrently). If you have too many things running on the cluster simultaneously, then you have three options:
+     * Increase the size of your driver
+     * Reduce the concurrency
+     * Spread the load over multiple clusters
+  * It could also be that you’re running non-Spark code on your cluster that is keeping the driver busy.
+
+* **Spark stage high I/O**
+  * High I/O: How much data needs to be in an I/O column to be considered high? To figure this out, first start with the highest number in any of the given columns. Then consider the total number of CPU cores you have across all our workers. Generally each core can read and write about 3 MBs per second (Divide your biggest I/O column by the number of cluster worker cores, then divide that by duration seconds).
+    ![image](https://github.com/user-attachments/assets/bda162e4-86c6-4324-a8b4-b23f4fb99fa4)
+
+  * High input: If you see a lot of input into your stage, that means you’re spending a lot of time reading data. First, identify what data this stage is reading using DAG. After you identify the specific data, here are some approaches to speeding up your reads:
+     * Use Delta
+     * Try Photon. It can help a lot with read speed, especially for wide tables
+     * Make your query more selective so it doesn’t need to read as much data.
+     * Reconsider your data layout so that data skipping is more effective.
+     * If you’re reading the same data multiple times, use the Delta cache.
+     * if you’re doing a join, consider trying to get DFP working.
+
+  * High output: If you see a lot of output from your stage, that means you’re spending a lot of time writing data. Here are some approaches to resolving this:
+     * Are you rewriting a lot of data? If you are rewriting a lot of data:
+        * See if you have a merge that needs to be optimized.
+        * Use deletion vectors to mark existing rows as removed or changed without rewriting the Parquet file.
+        * Enable Photon if it isn’t already. Photon can help a lot with write speed.
+
+* **Skew and spill**
+   * The first thing to look for in a long-running stage is whether there’s spill
+     ![image](https://github.com/user-attachments/assets/a5dcd3e1-5ec4-4feb-bd64-d1cc474a30e0)
+   * Spill is what happens when Spark runs low on memory. It starts to move data from memory to disk, and this can be quite expensive. It is most common during data shuffling.
+   * The default setting for the number of Spark SQL shuffle partitions (i.e., the number of CPU cores used to perform wide transformations such as joins, aggregations and so on) is 200, which isn’t always the best value. As a result, each Spark task (or CPU core) is given a large amount of data to process, and if the memory available to each core is insufficient to fit all of that data, some of it is spilled to disk. Spilling to disk is a costly operation, as it involves data serialization, de-serialization, reading and writing to disk, etc. Spilling needs to be avoided at all costs and in doing so, we must tune the number of shuffle partitions. There are a couple of ways to tune the number of Spark SQL shuffle partitions as discussed below.
+      * AQE auto-tuning (set spark.sql.shuffle.partitions=auto): Spark AQE has a feature called autoOptimizeShuffle (AOS), which can automatically find the right number of shuffle partitions.
+         * Caveat: unusually high compression.There are certain limitations to AOS. AOS may not be able to estimate the correct number of shuffle partitions in some circumstances where source tables have an unusually high compression ratio (20x to 40x).There are two ways you can identify the highly compressed tables:
+             *  Spark UI SQL DAG:
+               ![image](https://github.com/user-attachments/assets/c0291b37-7c1a-497c-840b-d143960c4369)
+Although “data size total” metrics in the Exchange node don’t provide the exact size of a table in memory, it can definitely help identify the highly compressed tables. Scan Parquet node provides the precise size of a table in the disk. The Exchange node data size in the aforementioned case is 40x larger than the size on the disk, indicating that the table is probably heavily compressed on the disk.
+
+             * Cache the table: A table can be cached in memory to figure out its actual size in memory. Here’s how to go about it: 
 
 
+
+ 
