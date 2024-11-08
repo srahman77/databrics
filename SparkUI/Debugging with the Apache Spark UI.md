@@ -102,7 +102,7 @@
         * Use deletion vectors to mark existing rows as removed or changed without rewriting the Parquet file.
         * Enable Photon if it isn’t already. Photon can help a lot with write speed.
 
-* **Skew and spill**
+* **Spill**
    * The first thing to look for in a long-running stage is whether there’s spill
      ![image](https://github.com/user-attachments/assets/a5dcd3e1-5ec4-4feb-bd64-d1cc474a30e0)
    * Spill is what happens when Spark runs low on memory. It starts to move data from memory to disk, and this can be quite expensive. It is most common during data shuffling.
@@ -144,6 +144,29 @@ Although “data size total” metrics in the Exchange node don’t provide the 
            * Because there may be multiple Spark SQL queries in a single notebook, fine-tuning the number of shuffle partitions for each query is a time-consuming task. So, our advice is to fine-tune it for the largest query with the greatest number for the total amount of data being shuffled for a shuffle stage and then set that value once for the entire notebook.
            * If there is skewness in data, then fine-tuning the shuffle partitions will not help with data spills. In that case, you should first get rid of the data skew. Please refer to the next section on data skew for more details.
 
+
+* **Skew**
+   * Data skew is the situation where only a few CPU cores wind up processing a huge amount of data due to uneven data distribution. For example, when you join or aggregate using the columns(s) around which data is not uniformly distributed, then you will end up with a skewed shuffle stage that will take a lot of time to finish (might actually fail as well after several attempts).
+   * The main thing to look for is the Max duration being much higher than the 75th percentile duration.If the Max duration is 50% more than the 75th percentile, you may be suffering from skew.
+   * Identification of skew:
+      * If all the Spark tasks for the shuffle stage are finished and just one or two of them are hanging for a long time, that’s an indication of skew. You can also get this information from Spark UI.
+        ![image](https://github.com/user-attachments/assets/f6ea0d4e-23fd-4d78-b85c-d4608c971ad8)
+     * In the tasks summary metrics, if you see a huge difference between the min,75th percentile and max shuffle read size, that’s also an indication of data skewness
+       ![: ](https://github.com/user-attachments/assets/57b140b5-ea91-4a87-90e4-af3e2807e759)
+     * Even after fine-tuning the number of shuffle partitions, if there are a lot of data spills, then this might actually be because of skewness
+     * Lastly, you can just simply count the number of rows while grouping by join or aggregation columns. If there is an enormous disparity between the row counts, then it’s a definite skew.
+   * Skew remediation:
+      1. Filter skewed values: If it’s possible to filter out the values around which there is a skew, then that will easily solve the issue. If you join using a column with a lot of null values, for example, you’ll have data skew. In this scenario, filtering out the null values will resolve the issue.
+      2. Skew hints: In the case where you are able to identify the table, the column, and preferably also the values that are causing data skew, then you can explicitly tell Spark about it using skew hints so that Spark can try to resolve it for you - SELECT /*+ SKEW(’table’, ’column_name’, (value1, value2)) */ * FROM table. *Skew join hints are not required. Databricks handles skew by default by using adaptive query execution (AQE). But if you specify, then it can reduce some work for the AQE*
+      3. AQE skew optimization: Spark 3.0+’s AQE can also dynamically solve the data skew for you. It’s by default enabled, but if you want to disable it, then set the following configuration to false: *set spark.sql.adaptive.skewJoin.enabled = false*. By default any partition that has at least 256MB of data and is at least 5 times bigger in size than the average partition size will be considered as a skewed partition by AQE. You can also change these values to fine-tune default AQE behavior:
+
+         -- default is 5; set spark.sql.adaptive.skewJoin.skewedPartitionFactor = <value>
+      
+          -- default is 256MB; set spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes = <size in bytes>
+       4. Salting: If none of the above-mentioned options work for you, the only other option is to do salting. It’s a strategy for breaking a large skewed partition into smaller partitions by appending random integers as suffixes to skewed column values. Salting should be the last choice, not the first, as it requires code changes. Hints and AQE solutions are much simpler to implement. **See on saltling for joins and aggregate- https://www.databricks.com/discover/pages/optimize-data-workloads-guide#data-skewness**. In aggregate, we needed to reverse the salting in the final step to get the expected result!
+          
+
+          
 
 
  
