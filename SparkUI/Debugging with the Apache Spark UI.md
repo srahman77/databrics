@@ -103,6 +103,7 @@
         * Enable Photon if it isn’t already. Photon can help a lot with write speed.
 
 * **Spill**
+   * A details note on shuffle and spills is available under optimization folder
    * The first thing to look for in a long-running stage is whether there’s spill
      ![image](https://github.com/user-attachments/assets/a5dcd3e1-5ec4-4feb-bd64-d1cc474a30e0)
    * Spill is what happens when Spark runs low on memory. It starts to move data from memory to disk, and this can be quite expensive. It is most common during data shuffling.
