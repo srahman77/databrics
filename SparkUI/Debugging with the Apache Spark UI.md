@@ -165,9 +165,10 @@ Although “data size total” metrics in the Exchange node don’t provide the 
       
           -- default is 256MB; set spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes = <size in bytes>
        4. Salting: If none of the above-mentioned options work for you, the only other option is to do salting. It’s a strategy for breaking a large skewed partition into smaller partitions by appending random integers as suffixes to skewed column values. Salting should be the last choice, not the first, as it requires code changes. Hints and AQE solutions are much simpler to implement. **See on saltling for joins and aggregate- https://www.databricks.com/discover/pages/optimize-data-workloads-guide#data-skewness**. In aggregate, we needed to reverse the salting in the final step to get the expected result!
-          
 
-          
+
+* **Many small Spark jobs**
+   *          
 
 
  
