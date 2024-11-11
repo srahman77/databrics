@@ -1,0 +1,36 @@
+The value of `spark.sql.shuffle.partitions` (e.g., 200) refers to the **total number of shuffle partitions** created across the entire Spark job, not per executor. This means that, regardless of how many executors you have in your cluster, Spark will aim to create the specified number of shuffle partitions **globally** during a shuffle stage.
+
+### Here's a breakdown of how it works:
+
+### 1. **Total Shuffle Files (Global Across All Executors)**:
+   - If `spark.sql.shuffle.partitions` is set to 200, Spark will create **200 shuffle partitions** after a shuffle operation. 
+   - These 200 shuffle partitions will be distributed across all the executors in the cluster.
+   
+   For example, if you have a cluster with 10 executors, each executor will process a subset of the 200 partitions, but the total number of partitions across the entire cluster will be 200. So, it's **not 200 shuffle partitions per executor**; it's 200 shuffle partitions in total for the entire shuffle stage.
+
+### 2. **How Spark Distributes Shuffle Partitions**:
+   - After the shuffle operation, each **task** in a stage will handle one of these shuffle partitions. The number of shuffle partitions (`spark.sql.shuffle.partitions`) determines how many tasks Spark will generate during the shuffle stage. 
+   - If you have, for example, 10 executors and `spark.sql.shuffle.partitions` is set to 200, Spark will distribute the 200 shuffle partitions across the 10 executors.
+   - Each executor may end up processing multiple shuffle partitions depending on the number of tasks that can run concurrently on that executor.
+
+### 3. **Task Parallelism and Shuffle Files**:
+   - **Shuffle partitions** correspond to **tasks** in the shuffle stage. In the example above, with 200 shuffle partitions, Spark will create 200 tasks to process those partitions.
+   - The tasks will be distributed across the available executors based on the number of cores and the executor configuration. For example, if you have 10 executors with 4 cores each, Spark may run up to 40 tasks concurrently (assuming sufficient parallelism), and those tasks will be responsible for processing the 200 shuffle partitions.
+   - After each task processes its shuffle partition, the output will be written to shuffle files (on disk or local storage), with the total number of shuffle files being equal to the total number of shuffle partitions (in this case, 200).
+
+### 4. **Example with 200 Shuffle Partitions**:
+   - Assume you set `spark.sql.shuffle.partitions = 200` and you have 10 executors.
+   - Spark will generate **200 shuffle partitions** in total.
+   - These 200 shuffle partitions will be distributed across the 10 executors based on the available resources and task scheduling. For example, each executor might process around 20 partitions, but the exact distribution depends on the workload and resource allocation.
+   - Each shuffle partition will correspond to a shuffle file, so you will end up with **200 shuffle files** in total.
+
+### 5. **How Does This Affect Performance?**
+   - **Too few partitions**: If `spark.sql.shuffle.partitions` is set too low (e.g., 10), each shuffle partition will be very large, which can lead to high memory usage per task and cause disk spilling if tasks don't fit in memory.
+   - **Too many partitions**: If `spark.sql.shuffle.partitions` is set too high (e.g., 1000), Spark will create too many small shuffle files, which can lead to excessive task scheduling overhead and inefficient task execution due to too many small files.
+
+### Conclusion:
+
+- `spark.sql.shuffle.partitions` determines the **total number of shuffle partitions** created during a shuffle stage, not the number of shuffle partitions per executor.
+- The number of shuffle files is directly tied to the number of shuffle partitions, so if you set `spark.sql.shuffle.partitions` to 200, Spark will create a total of **200 shuffle files** after the shuffle stage, distributed across the available executors. Each executor processes some subset of these partitions, but the total number of shuffle partitions is fixed at 200 (or whatever value you've set).
+
+This is why you typically tune `spark.sql.shuffle.partitions` based on the size of your data and the parallelism you need across the entire job, rather than worrying about per-executor file creation.

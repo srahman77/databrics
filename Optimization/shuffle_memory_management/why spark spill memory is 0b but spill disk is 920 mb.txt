@@ -1,0 +1,20 @@
+In Spark, the terms "spill memory" and "spill disk" refer to how data is managed during shuffle operations when the amount of data being processed exceeds the available memory resources.
+
+- **Spill Memory (0B)**: This indicates that no data was spilled to memory during the shuffle operation. Spark may use memory to store shuffle data during the shuffle process, but if the data fits within the allocated memory resources (such as the executor’s memory), no spilling to memory will occur. "0B" indicates that the memory space allocated for spilling was not used.
+
+- **Spill Disk (920MB)**: This refers to the amount of data that was spilled to disk. When Spark runs out of memory for shuffle operations, it begins spilling data to disk as a fallback. This disk spill occurs when the shuffle buffer exceeds the available memory, and the excess data is written to local disk.
+
+### Why this might happen:
+1. **Large Shuffle Size**: The total shuffle size might be large enough that it can't fit into memory, but Spark still manages to spill only to disk, not to memory.
+   
+2. **Memory Allocation vs. Disk Capacity**: Spark may have been configured with a large enough executor memory (or shuffle buffer size) that spilling to memory is avoided. However, if the total shuffle data is too large to fit in memory but within the disk capacity, it spills to disk instead.
+
+3. **Configuration Settings**:
+   - **spark.shuffle.spill.compress**: If this is set to `true`, it compresses spilled shuffle data on disk, which could help reduce the disk usage.
+   - **spark.shuffle.file.buffer**: This setting controls the buffer size for shuffle writes, which may affect how much data ends up spilling to disk.
+   - **spark.memory.fraction** and **spark.memory.storageFraction**: These configurations determine how much memory is allocated for storage and execution, influencing whether data will be spilled to disk or memory.
+
+4. **Spill Thresholds**: Spark’s shuffle process typically tries to spill to disk before using memory (depending on the settings and the shuffle operation). This suggests that while there is no need to spill to memory in your case, there is still enough excess shuffle data to require spilling to disk.
+
+### Summary:
+The 0B spill memory means that Spark didn't need to spill shuffle data into memory but instead directly spilled to disk when it exceeded the allocated memory limits. The 920MB spill to disk indicates that Spark needed more storage capacity than was available in memory, and thus spilled that amount to disk.
