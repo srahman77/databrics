@@ -29,7 +29,7 @@
      ![image](https://github.com/user-attachments/assets/295eda2b-78d3-4971-b6d9-28b022cbd166)
    * The most common reasons for executors being removed are:
       * Autoscaling: In this case it’s expected and not an error
-      * Spot instance losses: The cloud provider is reclaiming your VMs.
+      * Spot instance losses: The cloud provider is reclaiming your VMs. If you’re losing spot instances, you may be using an instance type that has a high reclaim rate. Consider changing your instance types. If you’re on Azure, refer to the pricing and eviction history section of the Azure Spot Virtual Machines topic to see how frequently each instance type gets reclaimed. *spot instance vms can be cheaper, but you have this issue of reclaiming it by the cloud provider*
       * Executors running out of memory
    * Failing jobs:
       * If you see any failing jobs, click on the link in description to get to their pages. Then scroll down to see the failed stage and a failure reason:
@@ -168,11 +168,69 @@ Although “data size total” metrics in the Exchange node don’t provide the 
 
 
 * **Many small Spark jobs**
-   *          
+   * If you see many small jobs, it’s likely you’re doing many operations on relatively small data (<10GB). Small operations only take a few seconds each, but they add up, and the time spent in overhead per operation also adds up.
+   * The best approach to speeding up small jobs is to run multiple operations in parallel
+      1. Separate your operations into multiple notebooks and run them in parallel on the same cluster by using multi-task jobs
+      2. Use SQL warehouses if all your queries are written in SQL. SQL warehouses scale very well for many queries run in parallel as they were designed for this type of workload.
+      3. Parameterize your notebook and use the for each task to run your notebook multiple times in parallel. Use Concurrency to set the level of parallelization. This works well with serverless compute.
+
+* **Spark memory issues**
+   * Memory issues often result in error messages such as the following: *SparkException: Job aborted due to stage failure: Task 3 in stage 0.0 failed 4 times, most recent failure: Lost task 3.3 in stage 0.0 (TID 30) (10.139.64.114 executor 4): ExecutorLostFailure (executor 4 exited caused by one of the running tasks) Reason: Remote RPC client disassociated. Likely due to containers exceeding thresholds, or network issues. Check driver logs for WARN messages*
+   * These error messages, however, are often generic and can be caused by other issues. So, if you suspect you have a memory issue, you can verify the issue by doubling the memory per core to see if it impacts your problem.
+   * For example, if you have a worker type with 4 cores and 16GB per memory, you can try switching to a worker type that has 4 cores and 32GB of memory. That will give you 8GB per core compared to the 4GB per core you had before. It’s the ratio of cores to memory that matters here. If it takes longer to fail with the extra memory or doesn’t fail at all, that’s a good sign that you’re on the right track.
+   * If you can fix your issue by increasing the memory, great! Maybe that’s the solution. If it doesn’t fix the issue, or you can’t bear the extra cost, you should dig deeper.
+      1. Too few shuffle partitions (spark.sql.shuffle.partitions set to a lower number causing the issue)
+      2. Large broadcast: not able to handle the broadcast variables in the memory
+      3. Window function without PARTITION BY statement
+      4. Skew
+      5. Streaming State
 
 
+* **One Spark task**
+   * If you see a long-running stage with just one task, that’s likely a sign of a problem. While this one task is running only one CPU is utilized and the rest of the cluster may be idle. This happens most frequently in the following situations:
+      1. Expensive UDF on small data
+      2. Window function without PARTITION BY statement
+      3. Reading from an unsplittable file type. This means the file cannot be read in multiple parts, so you end up with one big task. Gzip is an example of an unsplittable file type.
+      4. Setting the multiLine option when reading a JSON or CSV file
+      5. Schema inference of a large file
+      6. Use of repartition(1) or coalesce(1). Specifically coalesce(1)
+    
+* **Identifying an expensive read in Spark’s DAG**
+   * Assuming you’re looking at an expensive job, first we need the ID of the stage that’s doing the read. Here we can see the Stage ID is 194:
+     ![image](https://github.com/user-attachments/assets/057f7f3b-b2e8-46e8-9470-bcaa5f29d89b)
+   * Now we need to get to the SQL DAG. Scroll up to the top of the job’s page and click on the Associated SQL Query:
+     ![image](https://github.com/user-attachments/assets/da9bc9b7-f713-4f89-9448-5c90265062ce)
+   * You should now see the DAG. If not, scroll around a bit and you should see it:
+     ![image](https://github.com/user-attachments/assets/c55790de-4d55-4a46-85cf-567b397aa088)
+   * In some cases, you can follow the DAG and see where the data is coming from. In other cases, look for the Stage ID you noted:
+     ![image](https://github.com/user-attachments/assets/f6659898-e510-4fc4-b025-dd01924ec613)
+    * Then you need to look for the “Scan” node. In this case it’s pretty simple to tell that we’re reading a table named transactions. In some cases you may need to click on or roll over the node to get the location of the data you’re reading.:
+      ![image](https://github.com/user-attachments/assets/11fbd57e-97d7-45a2-8a55-d581777b8e1c)
+
+
+* **Slow Spark stage with little I/O (stage IO)**
+   * If you have a slow stage with not much I/O, this could be caused by:
+      * Reading a lot of small files: If you see one of your scan operators is taking a lot of time, open it up and look for the number of files read. If you’re reading tens of thousands of files or more, you may have a small file problem. Your files should be no less than 8MB. The small file problem is most often caused by partitioning on too many columns or a high-cardinality column. If you’re lucky, you might just need to run OPTIMIZE. Regardless, you need to reconsider your file layout.
+        ![image](https://github.com/user-attachments/assets/1f3171bc-e680-4950-ab6f-eb89a00c9312)
+
+      * Writing a lot of small files: If you see your write is taking a long time, open it up and look for the number of files and how much data was written. If you’re writing tens of thousands of files or more, you may have a small file problem. Your files should be no less than 8MB. The small file problem is most often caused by partitioning on too many columns or a high-cardinality column. You need to reconsider your file layout or turn on optimized writes.
+       ![image](https://github.com/user-attachments/assets/714ab131-327c-4307-b1de-5556a058eb08)
+
+      * Slow UDF(s) : If you know you have UDFs, or see something like below in your DAG, you might be suffering from slow UDFs. If you think you’re suffering from this problem, try commenting out your UDF to see how it impacts the speed of your pipeline. If the UDF is indeed where the time is being spent, your best bet is to rewrite the UDF using native functions. If that’s not possible, consider the number of tasks in the stage executing your UDF. If it’s less than the number of cores on your cluster, repartition() your dataframe **before** using the UDF as below.
+
+        (df.repartition(num_cores).withColumn('new_col', udf(...)))
+      
+       ![image](https://github.com/user-attachments/assets/4b6db39d-3e13-4553-9792-cb5465b68d50)
+
+        UDFs can also suffer from memory issues. Consider that each task may have to load all the data in its partition into memory. If this data is too big, things can get very slow or unstable. Repartition also can resolve this issue by making each task smaller.
  
-           
+      * Cartesian join
+      * Exploding join
+   * Almost all of these issues can be identified using the SQL DAG.
+   * Some nodes in the DAG have helpful time information and others don’t- just FYI.
+   * These times in the DAG node are cumulative, so it’s the total time spent on all the tasks, not the clock time. But it’s still very useful as they are correlated with clock time and cost.
+     
+
 
 
 
