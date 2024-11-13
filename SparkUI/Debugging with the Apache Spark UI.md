@@ -224,12 +224,23 @@ Although “data size total” metrics in the Exchange node don’t provide the 
 
         UDFs can also suffer from memory issues. Consider that each task may have to load all the data in its partition into memory. If this data is too big, things can get very slow or unstable. Repartition also can resolve this issue by making each task smaller.
  
-      * Cartesian join
-      * Exploding join
+      * Cartesian join : If you see a cartesian join or nested loop join in your DAG, you should know that these joins are very expensive. Make sure that’s what you intended and see if there’s another way.
+      * Exploding join : f you see a few rows going into a node and magnitudes more coming out, you may be suffering from an exploding join or explode()
+         ![image](https://github.com/user-attachments/assets/89f76875-533e-4094-9bcd-d271585bca20)
    * Almost all of these issues can be identified using the SQL DAG.
    * Some nodes in the DAG have helpful time information and others don’t- just FYI.
    * These times in the DAG node are cumulative, so it’s the total time spent on all the tasks, not the clock time. But it’s still very useful as they are correlated with clock time and cost.
-     
+
+
+* **Spark reqritting data: How to determine if Spark is rewriting data**
+   * First open the SQL DAG for your write stage. Scroll up to the top of the job’s page and click on the Associated SQL Query:
+   * If you’re doing a Delete or Update operation, look at the amount of data being written by the writer versus what you expect. If you’re seeing a lot more data being written than you expect, you’re probably rewriting data
+      ![image](https://github.com/user-attachments/assets/153b03d6-a0bf-46b2-ab8e-f18669f31ee1)
+   * If you’re doing a merge, the merge node has explicit statistics about how much data it’s rewriting.
+
+
+
+
 
 
 
