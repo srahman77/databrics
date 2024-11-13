@@ -230,6 +230,13 @@
     * Multiple writers across multiple clusters can simultaneously modify a table partition. Writers see a consistent snapshot view of the table and writes occur in a serial order.
     * Readers continue to see a consistent snapshot view of the table that the Azure Databricks job started with, even when a table is modified during a job.
 * Metadata changes cause all concurrent write operations to fail. These operations include changes to table protocol, table properties, or data schema.
+* **continue with the Pending**
+
+
+# Column mapping
+
+# Bloom Filter
+  * 
    
   
   
