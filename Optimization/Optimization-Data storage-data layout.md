@@ -51,3 +51,8 @@ ii)Partition columns should have low cardianilty. Too many distinct values will 
     2)It runs as a single operation and there is no intermendiate checkpoints for failover recovery
     3)No table level defination of Zorder. Hence everytime we run zorder, we need to provide the list of columns also.
 
+** Unlike Hive partitioning and Z-ordering, liquid clustering keys can be chosen purely based on the query predicate pattern, with no worry about future changes, cardinality, key order, file size, and potential data skew. Liquid clustering is flexible and adaptive (hence, its name), meaning that
+
+   1. Clustering keys can be changed without necessarily rebuilding the entire table
+   2. It eliminates the concept of partitions and can dynamically merge or further divide files in order to arrive at a balanced dataset with the ideal number and size of files.
+
