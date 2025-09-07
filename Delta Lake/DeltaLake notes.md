@@ -148,7 +148,20 @@ zcubes can be partial of stable depending on min_cube_size (100 gb) config. zcub
      *ANALYZE TABLE table_name COMPUTE DELTA STATISTICS*
 * Long strings are truncated during statistics collection. You might choose to exclude long string columns from statistics collection, especially if the columns aren’t used frequently for filtering queries.
 
-# Change Data Feed (Go through while learning staructured streaming)
+# Change Data Feed (Go through while learning staructured streaming):
+* delta.enableChangeDataFeed = true
+* Change Data Feed (CDF) feature allows Delta tables to track row-level changes (not like just versioning, but row level changes) between versions of a Delta table. When enabled on a Delta table, the runtime records “change events” for all the data written into the table. This includes the row data along with metadata indicating whether the specified row was inserted, deleted, or updated.
+* Use cases :Change Data Feed is not enabled by default. The following use cases should drive when you enable the change data feed.
+   * Silver and Gold tables: Improve Delta performance by processing only row-level changes following initial MERGE, UPDATE, or DELETE operations to accelerate and simplify ETL and ELT operations.
+   * Transmit changes: Send a change data feed to downstream systems such as Kafka or RDBMS that can use it to incrementally process in later stages of data pipelines.
+   * Audit trail table: Capture the change data feed as a Delta table provides perpetual storage and efficient query capability to see all changes over time, including when deletes occur and what updates were made.
+* Read changes in batch queries: You can provide either version or timestamp for the start and end. The start and end versions and timestamps are inclusive in the queries.  e.g SELECT * FROM table_changes('tableName', 0, 10) (version as ints or longs e.g. changes from version 0 to 10)
+* What is the overhead of enabling the change data feed? There is no significant impact. The change data records are generated in line during the query execution process, and are generally much smaller than the total size of rewritten files.
+* What is the retention policy for change records? :Change records follow the same retention policy as out-of-date table versions, and will be cleaned up through VACUUM if they are outside the specified retention period.
+* When do new records become available in the change data feed? Change data is committed along with the Delta Lake transaction, and will become available at the same time as the new data is available in the table.
+
+
+
 
 # Constraints on Az Databricks:
 * Azure Databricks supports standard SQL constraint management clauses. All constraints on Azure Databricks require Delta Lake (Delta Live Tables has a similar concept known as expectations). Constraints fall into two categories:
